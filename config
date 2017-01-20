@@ -47,7 +47,7 @@ CHALLENGETYPE="dns-01"
 #WELLKNOWN="/var/www/dehydrated"
 
 # Default keysize for private keys (default: 4096)
-#KEYSIZE="4096"
+KEYSIZE="2048"
 
 # Path to openssl config file (default: <unset> - tries to figure out system default)
 #OPENSSL_CNF=
@@ -65,7 +65,7 @@ CHALLENGETYPE="dns-01"
 HOOK=$SCRIPTDIR/cns-hook
 
 # Chain clean_challenge|deploy_challenge arguments together into one hook call per certificate (default: no)
-HOOK_CHAIN="yes"
+HOOK_CHAIN="no"
 
 # Minimum days before expiration to automatically renew certificate (default: 30)
 #RENEW_DAYS="30"
@@ -77,7 +77,7 @@ HOOK_CHAIN="yes"
 #PRIVATE_KEY_ROLLOVER="no"
 
 # Which public key algorithm should be used? Supported: rsa, prime256v1 and secp384r1
-#KEY_ALGO=rsa
+KEY_ALGO=rsa
 
 # E-mail to use during the registration (default: <unset>)
 #CONTACT_EMAIL=
