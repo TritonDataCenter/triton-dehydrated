@@ -1,12 +1,19 @@
 #!/usr/bin/env bash
-dir="$(pwd)"
+
+# Find directory in which this script is stored by traversing all symbolic links
+SOURCE="${0}"
+while [ -h "$SOURCE" ]; do # resolve $SOURCE until the file is no longer a symlink
+  DIR="$( cd -P "$( dirname "$SOURCE" )" && pwd )"
+  SOURCE="$(readlink "$SOURCE")"
+  [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE" # if $SOURCE was a relative symlink, we need to resolve it relative to the path where the symlink file was located
+done
+SCRIPTDIR="$( cd -P "$( dirname "$SOURCE" )" && pwd )"
+
 export PATH="/usr/xpg4/bin:$PATH"
-export CURL_CA_BUNDLE="$(pwd)/cacert.pem"
-if [ ! -f "${dir}/cacert.pem" ]; then
-	cat >"${dir}/cacert.pem" <<EOF
-# By default the Triton headnode GZ has no CA trust bundle for curl
-# So we'll bootstrap it by assuming that curl.haxx.se is signed by DST
-# And download a full bundle from there.
+export CURL_CA_BUNDLE="$SCRIPTDIR/cacert.pem"
+if [ ! -f "$SCRIPTDIR/cacert.pem" ]; then
+	cat >"$SCRIPTDIR/cacert.pem" <<EOF
+#
 
 DST Root CA X3
 ==============
@@ -28,10 +35,11 @@ RLtTcm1D9SZImlJnt1ir/md2cXjbDaJWFBM5JDGFoqgCWjBH4d1QB7wCCZAA62RjYJsWvIjJEubS
 fZGL+T0yjWW06XyxV3bqxbYoOb8VZRzI9neWagqNdwvYkQsEjgfbKbYK7p2CNTUQ
 -----END CERTIFICATE-----
 EOF
-	curl -o "${dir}/cacert.pem" https://curl.haxx.se/ca/cacert.pem
+	curl -o "$SCRIPTDIR/cacert.pem" https://curl.haxx.se/ca/cacert.pem
 fi
-if [ ! -f "${dir}/dehydrated" ]; then
-	curl -Lo "${dir}/dehydrated" https://raw.githubusercontent.com/lukas2511/dehydrated/master/dehydrated
-	chmod a+x "${dir}/dehydrated"
+if [ ! -f "$SCRIPTDIR/dehydrated" ]; then
+	curl -Lo "$SCRIPTDIR/dehydrated" https://raw.githubusercontent.com/lukas2511/dehydrated/master/dehydrated
+	chmod a+x "$SCRIPTDIR/dehydrated"
 fi
-exec ./dehydrated $@
+exec $SCRIPTDIR/dehydrated $@
+
