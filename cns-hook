@@ -163,7 +163,43 @@ function deploy_cert {
 
 function unchanged_cert {
 	local domain="${1}" keyfile="${2}" certfile="${3}" fullchainfile="${4}" chainfile="${5}"
-	echo "Certificate for domain $DOMAIN is still valid - no action taken"
+
+	local vmuuid
+	local certdir="$(dirname "$certfile")"
+	case "$(getservice "${domain}")" in
+	cloudapi)
+		vmuuid="$(vmadm lookup alias=cloudapi0)"
+		if [ ! -f "${certdir}/dhparams.pem" ]; then
+			openssl dhparam 2048 > "${certdir}/dhparams.pem"
+		fi
+		cat "${keyfile}" "${fullchainfile}" "${certdir}/dhparams.pem" > "${certdir}/stud.pem"
+		local target="/zones/${vmuuid}/root/opt/smartdc/cloudapi/ssl/stud.pem"
+		if ! diff "${certdir}/stud.pem" "${target}" >/dev/null; then
+			cp "${certdir}/stud.pem" "/zones/${vmuuid}/root/opt/smartdc/cloudapi/ssl/stud.pem"
+			zlogin "${vmuuid}" svcadm restart stud
+			echo "OK: cloudapi certificate deployed, and stud restarted" >&2
+		fi
+		echo "OK: cloudapi certificate up to date" >&2
+		;;
+	adminui)
+		vmuuid="$(vmadm lookup alias=adminui0)"
+		cat "${keyfile}" "${fullchainfile}" > "${certdir}/combined.pem"
+		local target="/zones/${vmuuid}/root/opt/smartdc/adminui/etc/ssl/default.pem"
+		if ! diff "${certdir}/combined.pem" "${target}" >/dev/null; then
+			cp "${certdir}/combined.pem" "/zones/${vmuuid}/root/opt/smartdc/adminui/etc/ssl/default.pem"
+			zlogin "${vmuuid}" svcadm restart adminui
+			echo "OK: adminui certificate deployed, and adminui restarted" >&2
+		fi
+		echo "OK: adminui certificate up to date" >&2
+		;;
+	docker|manta)
+		echo "OK: certificate up to date" >&2
+		;;
+	*)
+		echo "ERROR: Unknown domain: ${domain}" >&2
+		exit 1
+		;;
+	esac
 }
 
 handler=$1
