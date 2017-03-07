@@ -29,7 +29,6 @@ function verifyvm {
 			exit 1
 		fi
 	fi
-	
 }
 
 function waitfortxt {
@@ -203,6 +202,10 @@ function unchanged_cert {
 }
 
 function exit_hook {
+	exit 0
+}
+
+function invalid_challenge {
 	exit 0
 }
 
