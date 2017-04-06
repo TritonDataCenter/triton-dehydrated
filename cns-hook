@@ -29,6 +29,7 @@ function verifyvm {
 			exit 1
 		fi
 	fi
+
 }
 
 function waitfortxt {
@@ -170,14 +171,19 @@ function deploy_cert {
 			openssl dhparam 2048 > "${certdir}/dhparams.pem"
 		fi
 		cat "${keyfile}" "${fullchainfile}" "${certdir}/dhparams.pem" > "${certdir}/stud.pem"
-		cp "${certdir}/stud.pem" "/zones/${vmuuid}/root/opt/smartdc/cloudapi/ssl/stud.pem"
-		zlogin "${vmuuid}" svcadm restart stud
-		echo "OK: cloudapi certificate deployed, and stud restarted" >&2
+		local subd="$(cat "${certdir}/stud.pem" | tr '\n' '\\' | sed 's/\\/\\n/g')"
+		local muuid
+		read muuid < <(sdc-sapi /manifests -XPOST -d '{"name": "cert", "version":"1.0.0", "path": "/opt/smartdc/cloudapi/ssl/stud.pem","post_cmd":"/usr/sbin/svcadm restart stud","template":"'"${subd}"'"}' | json -H uuid)
+		local svcuuid
+		read svcuuid < <(sdc-sapi /services?name=cloudapi | json -Ha uuid)
+		sdc-sapi /services/${svcuuid} -XPUT -d '{"manifests":{"cert":"'"${muuid}"'"}}' >/dev/null
+		echo "OK: cloudapi certificate deployed (sapi manifest updated)" >&2
 		;;
 	adminui)
 		vmuuid="$(vmadm lookup alias=adminui0)"
 		cat "${keyfile}" "${fullchainfile}" > "${certdir}/combined.pem"
 		cp "${certdir}/combined.pem" "/zones/${vmuuid}/root/opt/smartdc/adminui/etc/ssl/default.pem"
+		rm /zones/${vmuuid}/root/opt/smartdc/adminui/etc/ssl/ADMINUI.*
 		zlogin "${vmuuid}" svcadm restart adminui
 		echo "OK: adminui certificate deployed, and adminui restarted" >&2
 		;;
@@ -235,9 +241,13 @@ function unchanged_cert {
 		cat "${keyfile}" "${fullchainfile}" "${certdir}/dhparams.pem" > "${certdir}/stud.pem"
 		local target="/zones/${vmuuid}/root/opt/smartdc/cloudapi/ssl/stud.pem"
 		if ! diff "${certdir}/stud.pem" "${target}" >/dev/null; then
-			cp "${certdir}/stud.pem" "/zones/${vmuuid}/root/opt/smartdc/cloudapi/ssl/stud.pem"
-			zlogin "${vmuuid}" svcadm restart stud
-			echo "OK: cloudapi certificate deployed, and stud restarted" >&2
+			local subd="$(cat "${certdir}/stud.pem" | tr '\n' '\\' | sed 's/\\/\\n/g')"
+			local muuid
+			read muuid < <(sdc-sapi /manifests -XPOST -d '{"name": "cert", "version":"1.0.0", "path": "/opt/smartdc/cloudapi/ssl/stud.pem","post_cmd":"/usr/sbin/svcadm restart stud","template":"'"${subd}"'"}' | json -H uuid)
+			local svcuuid
+			read svcuuid < <(sdc-sapi /services?name=cloudapi | json -Ha uuid)
+			sdc-sapi /services/${svcuuid} -XPUT -d '{"manifests":{"cert":"'"${muuid}"'"}}' >/dev/null
+			echo "OK: cloudapi certificate deployed (sapi manifest updated)" >&2
 		fi
 		echo "OK: cloudapi certificate up to date" >&2
 		;;
@@ -247,6 +257,7 @@ function unchanged_cert {
 		local target="/zones/${vmuuid}/root/opt/smartdc/adminui/etc/ssl/default.pem"
 		if ! diff "${certdir}/combined.pem" "${target}" >/dev/null; then
 			cp "${certdir}/combined.pem" "/zones/${vmuuid}/root/opt/smartdc/adminui/etc/ssl/default.pem"
+			rm /zones/${vmuuid}/root/opt/smartdc/adminui/etc/ssl/ADMINUI.*
 			zlogin "${vmuuid}" svcadm restart adminui
 			echo "OK: adminui certificate deployed, and adminui restarted" >&2
 		fi
