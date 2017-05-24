@@ -10,6 +10,8 @@ function getservice {
 		echo "docker"
 	elif grep 'manta' >/dev/null <<< "$domain"; then
 		echo "manta"
+	elif grep 'sdcsso' >/dev/null <<< "$domain"; then
+		echo "sdcsso"
 	fi
 }
 
@@ -73,6 +75,12 @@ function deploy_challenge {
 		verifyvm "$domain" "$vmuuid"
 		update_remotevm "$vmuuid" "$tokenval"
 		;;
+	sdcsso)
+		local admin=$(sdc-useradm get admin | json uuid)
+		vmuuid=$(sdc-vmadm list -H -o uuid owner_uuid="$admin" alias="sdcsso" | tail -1)
+		verifyvm "$domain" "$vmuuid"
+		update_remotevm "$vmuuid" "$tokenval"
+		;;
 	*)
 		echo "ERROR: Unknown domain: ${domain}" >&2
 		exit 1
@@ -93,6 +101,12 @@ function clean_challenge {
 	cloudapi|adminui|docker)
 		local alias="$(getservice "${domain}")0"
 		vmuuid="$(vmadm lookup alias=$alias)"
+		verifyvm "$domain" "$vmuuid"
+		echo "{\"remove_customer_metadata\":[\"triton.cns.acme-challenge\"]}" | \
+			vmadm update "$vmuuid"
+		;;
+	sdcsso)
+		vmuuid="$(vmadm lookup alias=sdcsso)"
 		verifyvm "$domain" "$vmuuid"
 		echo "{\"remove_customer_metadata\":[\"triton.cns.acme-challenge\"]}" | \
 			vmadm update "$vmuuid"
@@ -124,6 +138,13 @@ function deploy_cert {
 		cp "${certdir}/combined.pem" "/zones/${vmuuid}/root/opt/smartdc/adminui/etc/ssl/default.pem"
 		zlogin "${vmuuid}" svcadm restart adminui
 		echo "OK: adminui certificate deployed, and adminui restarted" >&2
+		;;
+	sdcsso)
+		vmuuid="$(vmadm lookup alias=sdcsso)"
+                cp "${certdir}/fullchain.pem" "/zones/${vmuuid}/root/opt/smartdc/sdcsso/ssl/cert.pem"
+                cp "${certdir}/privkey.pem" "/zones/${vmuuid}/root/opt/smartdc/sdcsso/ssl/key.pem"
+		zlogin "${vmuuid}" svcadm restart sdcsso
+		echo "OK: sdcsso certificate deployed, and sdcsso restarted" >&2
 		;;
 	docker)
 		sdcadm experimental install-docker-cert \
@@ -190,6 +211,29 @@ function unchanged_cert {
 			echo "OK: adminui certificate deployed, and adminui restarted" >&2
 		fi
 		echo "OK: adminui certificate up to date" >&2
+		;;
+	sdcsso)
+                vmuuid="$(vmadm lookup alias=sdcsso)"
+                local target="/zones/${vmuuid}/root/opt/smartdc/sdcsso/ssl/cert.pem"
+                local target_key="/zones/${vmuuid}/root/opt/smartdc/sdcsso/ssl/key.pem"
+                local restart=false
+
+                if ! diff "${certdir}/fullchain.pem" "${target}" >/dev/null; then
+                        cp "${certdir}/fullchain.pem" "/zones/${vmuuid}/root/opt/smartdc/sdcsso/ssl/cert.pem"
+                        restart=true
+                fi
+
+                if ! diff "${keyfile}" "${target_key}" >/dev/null; then
+                        cp "${certdir}/privkey.pem" "/zones/${vmuuid}/root/opt/smartdc/sdcsso/ssl/key.pem"
+                        restart=true
+                fi
+
+                if ${restart} == true; then
+                        zlogin "${vmuuid}" svcadm restart sdcsso
+                        echo "OK: sdcsso certificate/key deployed, and sdcsso restarted" >&2
+                else
+                        echo "OK: sdcsso certificate/key up to date" >&2
+                fi
 		;;
 	docker|manta)
 		echo "OK: certificate up to date" >&2
