@@ -34,13 +34,16 @@ function verifyvm {
 }
 
 function waitfortxt {
-    local domain="$1" txtval="$2"
-    while true; do
-        if dig +short txt "_acme-challenge.${domain}" @8.8.8.8 | grep "${txtval}" >/dev/null; then
-            break;
-        fi
-        sleep 1
-    done
+	local domain="$1" txtval="$2"
+	local count=0
+	while [ $count -lt 10 ]; do
+		if dig +short txt "_acme-challenge.${domain}" @8.8.8.8 | grep "${txtval}" >/dev/null; then
+			count=$(($count + 1))
+		else
+			count=0
+			sleep 1
+		fi
+	done
 }
 
 function update_localvm {
