@@ -1,218 +1,218 @@
 #!/usr/bin/env bash
 
 function getservice {
-	local domain="${1}"
-	if grep '^cloudapi\.' >/dev/null <<< "$domain"; then
-		echo "cloudapi"
-	elif grep '^adminui\.' >/dev/null <<< "$domain"; then
-		echo "adminui"
-	elif grep '^docker\.' >/dev/null <<< "$domain"; then
-		echo "docker"
-	elif grep 'manta' >/dev/null <<< "$domain"; then
-		echo "manta"
-	elif grep 'sdcsso' >/dev/null <<< "$domain"; then
-		echo "sdcsso"
-	fi
+    local domain="${1}"
+    if grep '^cloudapi\.' >/dev/null <<< "$domain"; then
+        echo "cloudapi"
+    elif grep '^adminui\.' >/dev/null <<< "$domain"; then
+        echo "adminui"
+    elif grep '^docker\.' >/dev/null <<< "$domain"; then
+        echo "docker"
+    elif grep 'manta' >/dev/null <<< "$domain"; then
+        echo "manta"
+    elif grep 'sdcsso' >/dev/null <<< "$domain"; then
+        echo "sdcsso"
+    fi
 }
 
 function verifyvm {
-	local domain="${1}" vmuuid="${2}"
+    local domain="${1}" vmuuid="${2}"
 
-	if ! dig +short txt "${domain}" @8.8.8.8 | sed 's/"//g' | grep "^${vmuuid}" >/dev/null; then
-		echo "ERROR: ${domain} does not appear to be a CNS name or CNAME to a CNS name for VM ${vmuuid}" >&2
-		exit 1
-	fi
+    if ! dig +short txt "${domain}" @8.8.8.8 | sed 's/"//g' | grep "^${vmuuid}" >/dev/null; then
+        echo "ERROR: ${domain} does not appear to be a CNS name or CNAME to a CNS name for VM ${vmuuid}" >&2
+        exit 1
+    fi
 
-	local cname="$(dig +short cname "${domain}" @8.8.8.8)"
-	if [ "a$cname" != "a" ]; then
-		local acmecname="$(dig +short cname "_acme-challenge.${domain}" @8.8.8.8)"
-		if [ "a$acmecname" == "a" ]; then
-			echo "ERROR: ${domain} is a CNAME to ${cname}, but _acme-challenge.${domain} is not a CNAME" >&2
-			exit 1
-		fi
-	fi
+    local cname="$(dig +short cname "${domain}" @8.8.8.8)"
+    if [ "a$cname" != "a" ]; then
+        local acmecname="$(dig +short cname "_acme-challenge.${domain}" @8.8.8.8)"
+        if [ "a$acmecname" == "a" ]; then
+            echo "ERROR: ${domain} is a CNAME to ${cname}, but _acme-challenge.${domain} is not a CNAME" >&2
+            exit 1
+        fi
+    fi
 }
 
 function waitfortxt {
-	local domain="$1" txtval="$2"
-	while true; do
-		if dig +short txt "_acme-challenge.${domain}" @8.8.8.8 | grep "${txtval}" >/dev/null; then
-			break;
-		fi
-		sleep 1
-	done
+    local domain="$1" txtval="$2"
+    while true; do
+        if dig +short txt "_acme-challenge.${domain}" @8.8.8.8 | grep "${txtval}" >/dev/null; then
+            break;
+        fi
+        sleep 1
+    done
 }
 
 function update_localvm {
-	local vmuuid="$1" tokenval="$2"
-	echo "{\"set_customer_metadata\":{\"triton.cns.acme-challenge\":\"${tokenval}\"}}" | \
-		vmadm update "$vmuuid"
+    local vmuuid="$1" tokenval="$2"
+    echo "{\"set_customer_metadata\":{\"triton.cns.acme-challenge\":\"${tokenval}\"}}" | \
+        vmadm update "$vmuuid"
 }
 
 function update_remotevm {
-	local vmuuid="$1" tokenval="$2"
-	sdc-vmadm get $vmuuid | \
-		json -j customer_metadata not_a_key | \
-		json -j -e "this.customer_metadata['triton.cns.acme-challenge'] = '${tokenval}'" | \
-		json -j -e "this.payload = { customer_metadata: this.customer_metadata };" payload not_a_key | \
-		sdc-vmadm update $vmuuid
+    local vmuuid="$1" tokenval="$2"
+    sdc-vmadm get $vmuuid | \
+        json -j customer_metadata not_a_key | \
+        json -j -e "this.customer_metadata['triton.cns.acme-challenge'] = '${tokenval}'" | \
+        json -j -e "this.payload = { customer_metadata: this.customer_metadata };" payload not_a_key | \
+        sdc-vmadm update $vmuuid
 }
 
 function deploy_challenge {
-	local domain="${1}" tokenfn="${2}" tokenval="${3}"
+    local domain="${1}" tokenfn="${2}" tokenval="${3}"
 
-	local vmuuid
-	case "$(getservice "${domain}")" in
-	cloudapi|adminui|docker)
-		local alias="$(getservice "${domain}")0"
-		vmuuid="$(vmadm lookup alias=$alias)"
-		verifyvm "$domain" "$vmuuid"
-		update_localvm "$vmuuid" "$tokenval"
-		;;
-	manta)
-		local poseidon=$(sdc-useradm get poseidon | json uuid)
-		vmuuid=$(sdc-vmadm list -H -o uuid owner_uuid="$poseidon" alias="loadbalancer" | tail -1)
-		verifyvm "$domain" "$vmuuid"
-		update_remotevm "$vmuuid" "$tokenval"
-		;;
-	sdcsso)
-		local admin=$(sdc-useradm get admin | json uuid)
-		vmuuid=$(sdc-vmadm list -H -o uuid owner_uuid="$admin" alias="sdcsso" | tail -1)
-		verifyvm "$domain" "$vmuuid"
-		update_remotevm "$vmuuid" "$tokenval"
-		;;
-	*)
-		echo "ERROR: Unknown domain: ${domain}" >&2
-		exit 1
-		;;
-	esac
+    local vmuuid
+    case "$(getservice "${domain}")" in
+    cloudapi|adminui|docker)
+        local alias="$(getservice "${domain}")0"
+        vmuuid="$(vmadm lookup alias=$alias)"
+        verifyvm "$domain" "$vmuuid"
+        update_localvm "$vmuuid" "$tokenval"
+        ;;
+    manta)
+        local poseidon=$(sdc-useradm get poseidon | json uuid)
+        vmuuid=$(sdc-vmadm list -H -o uuid owner_uuid="$poseidon" alias="loadbalancer" | tail -1)
+        verifyvm "$domain" "$vmuuid"
+        update_remotevm "$vmuuid" "$tokenval"
+        ;;
+    sdcsso)
+        local admin=$(sdc-useradm get admin | json uuid)
+        vmuuid=$(sdc-vmadm list -H -o uuid owner_uuid="$admin" alias="sdcsso" | tail -1)
+        verifyvm "$domain" "$vmuuid"
+        update_localvm "$vmuuid" "$tokenval"
+        ;;
+    *)
+        echo "ERROR: Unknown domain: ${domain}" >&2
+        exit 1
+        ;;
+    esac
 
-	waitfortxt "$domain" "$tokenval"
+    waitfortxt "$domain" "$tokenval"
 
-	echo "OK: deployed dns token for ${domain} successfully" >&2
-	exit 0
+    echo "OK: deployed dns token for ${domain} successfully" >&2
+    exit 0
 }
 
 function clean_challenge {
-	local domain="${1}" tokenfn="${2}" tokenval="${3}"
+    local domain="${1}" tokenfn="${2}" tokenval="${3}"
 
-	local vmuuid
-	case "$(getservice "${domain}")" in
-	cloudapi|adminui|docker)
-		local alias="$(getservice "${domain}")0"
-		vmuuid="$(vmadm lookup alias=$alias)"
-		verifyvm "$domain" "$vmuuid"
-		echo "{\"remove_customer_metadata\":[\"triton.cns.acme-challenge\"]}" | \
-			vmadm update "$vmuuid"
-		;;
-	sdcsso)
-		vmuuid="$(vmadm lookup alias=sdcsso)"
-		verifyvm "$domain" "$vmuuid"
-		echo "{\"remove_customer_metadata\":[\"triton.cns.acme-challenge\"]}" | \
-			vmadm update "$vmuuid"
-		;;
-	esac
+    local vmuuid
+    case "$(getservice "${domain}")" in
+    cloudapi|adminui|docker)
+        local alias="$(getservice "${domain}")0"
+        vmuuid="$(vmadm lookup alias=$alias)"
+        verifyvm "$domain" "$vmuuid"
+        echo "{\"remove_customer_metadata\":[\"triton.cns.acme-challenge\"]}" | \
+            vmadm update "$vmuuid"
+        ;;
+    sdcsso)
+        vmuuid="$(vmadm lookup alias=sdcsso)"
+        verifyvm "$domain" "$vmuuid"
+        echo "{\"remove_customer_metadata\":[\"triton.cns.acme-challenge\"]}" | \
+            vmadm update "$vmuuid"
+        ;;
+    esac
 
-	exit 0
+    exit 0
 }
 
 function deploy_cert {
-	local domain="${1}" keyfile="${2}" certfile="${3}" fullchainfile="${4}" chainfile="${5}"
+    local domain="${1}" keyfile="${2}" certfile="${3}" fullchainfile="${4}" chainfile="${5}"
 
-	local vmuuid
-	local certdir="$(dirname "$certfile")"
-	case "$(getservice "${domain}")" in
-	cloudapi)
-		vmuuid="$(vmadm lookup alias=cloudapi0)"
-		if [ ! -f "${certdir}/dhparams.pem" ]; then
-			openssl dhparam 2048 > "${certdir}/dhparams.pem"
-		fi
-		cat "${keyfile}" "${fullchainfile}" "${certdir}/dhparams.pem" > "${certdir}/stud.pem"
-		cp "${certdir}/stud.pem" "/zones/${vmuuid}/root/opt/smartdc/cloudapi/ssl/stud.pem"
-		zlogin "${vmuuid}" svcadm restart stud
-		echo "OK: cloudapi certificate deployed, and stud restarted" >&2
-		;;
-	adminui)
-		vmuuid="$(vmadm lookup alias=adminui0)"
-		cat "${keyfile}" "${fullchainfile}" > "${certdir}/combined.pem"
-		cp "${certdir}/combined.pem" "/zones/${vmuuid}/root/opt/smartdc/adminui/etc/ssl/default.pem"
-		zlogin "${vmuuid}" svcadm restart adminui
-		echo "OK: adminui certificate deployed, and adminui restarted" >&2
-		;;
-	sdcsso)
-		vmuuid="$(vmadm lookup alias=sdcsso)"
-                cp "${certdir}/fullchain.pem" "/zones/${vmuuid}/root/opt/smartdc/sdcsso/ssl/cert.pem"
-                cp "${certdir}/privkey.pem" "/zones/${vmuuid}/root/opt/smartdc/sdcsso/ssl/key.pem"
-		zlogin "${vmuuid}" svcadm restart sdcsso
-		echo "OK: sdcsso certificate deployed, and sdcsso restarted" >&2
-		;;
-	docker)
-		sdcadm experimental install-docker-cert \
-			-k "${keyfile}" -c "${fullchainfile}"
-		local ep="tcp://${domain}:2376"
-		local cloudapi_svc=$(sdc-sapi /services?name=cloudapi | json -H 0.uuid)
-		sapiadm get $cloudapi_svc | \
-			json -e "
-				svcs = JSON.parse(this.metadata.CLOUDAPI_SERVICES || '{}');
-				svcs.docker = '${ep}';
-				this.update = {metadata: {CLOUDAPI_SERVICES: JSON.stringify(svcs)}};
-				" update | \
-			sapiadm update $cloudapi_svc
-		echo "OK: docker certificate deployed" >&2
-		;;
-	manta)
-		if [ ! -f "${certdir}/dhparams.pem" ]; then
-			openssl dhparam 2048 > "${certdir}/dhparams.pem"
-		fi
-		cat "${keyfile}" "${fullchainfile}" "${certdir}/dhparams.pem" > "${certdir}/stud.pem"
-		local mantazone=$(vmadm lookup alias=manta0)
-		cp "${certdir}/stud.pem" /zones/$mantazone/root/var/tmp/stud.pem
-		zlogin $mantazone bash --login -c '/opt/smartdc/manta-deployment/cmd/manta-replace-cert.js /var/tmp/stud.pem'
-		rm /zones/$mantazone/root/var/tmp/stud.pem
-		echo "OK: New Manta certificate deployed, but loadbalancers have not been restarted." >&2
-		echo "    You will need to visit each loadbalancer instance with manta-login and " >&2
-		echo "    restart the 'stud' service." >&2
-		;;
-	*)
-		echo "ERROR: Unknown domain: ${domain}" >&2
-		exit 1
-		;;
-	esac
+    local vmuuid
+    local certdir="$(dirname "$certfile")"
+    case "$(getservice "${domain}")" in
+    cloudapi)
+        vmuuid="$(vmadm lookup alias=cloudapi0)"
+        if [ ! -f "${certdir}/dhparams.pem" ]; then
+            openssl dhparam 2048 > "${certdir}/dhparams.pem"
+        fi
+        cat "${keyfile}" "${fullchainfile}" "${certdir}/dhparams.pem" > "${certdir}/stud.pem"
+        cp "${certdir}/stud.pem" "/zones/${vmuuid}/root/opt/smartdc/cloudapi/ssl/stud.pem"
+        zlogin "${vmuuid}" svcadm restart stud
+        echo "OK: cloudapi certificate deployed, and stud restarted" >&2
+        ;;
+    adminui)
+        vmuuid="$(vmadm lookup alias=adminui0)"
+        cat "${keyfile}" "${fullchainfile}" > "${certdir}/combined.pem"
+        cp "${certdir}/combined.pem" "/zones/${vmuuid}/root/opt/smartdc/adminui/etc/ssl/default.pem"
+        zlogin "${vmuuid}" svcadm restart adminui
+        echo "OK: adminui certificate deployed, and adminui restarted" >&2
+        ;;
+    sdcsso)
+        vmuuid="$(vmadm lookup alias=sdcsso)"
+        cp "${certdir}/fullchain.pem" "/zones/${vmuuid}/root/opt/smartdc/sdcsso/ssl/cert.pem"
+        cp "${certdir}/privkey.pem" "/zones/${vmuuid}/root/opt/smartdc/sdcsso/ssl/key.pem"
+        zlogin "${vmuuid}" svcadm restart sdcsso
+        echo "OK: sdcsso certificate deployed, and sdcsso restarted" >&2
+        ;;
+    docker)
+        sdcadm experimental install-docker-cert \
+            -k "${keyfile}" -c "${fullchainfile}"
+        local ep="tcp://${domain}:2376"
+        local cloudapi_svc=$(sdc-sapi /services?name=cloudapi | json -H 0.uuid)
+        sapiadm get $cloudapi_svc | \
+            json -e "
+                svcs = JSON.parse(this.metadata.CLOUDAPI_SERVICES || '{}');
+                svcs.docker = '${ep}';
+                this.update = {metadata: {CLOUDAPI_SERVICES: JSON.stringify(svcs)}};
+                " update | \
+            sapiadm update $cloudapi_svc
+        echo "OK: docker certificate deployed" >&2
+        ;;
+    manta)
+        if [ ! -f "${certdir}/dhparams.pem" ]; then
+            openssl dhparam 2048 > "${certdir}/dhparams.pem"
+        fi
+        cat "${keyfile}" "${fullchainfile}" "${certdir}/dhparams.pem" > "${certdir}/stud.pem"
+        local mantazone=$(vmadm lookup alias=manta0)
+        cp "${certdir}/stud.pem" /zones/$mantazone/root/var/tmp/stud.pem
+        zlogin $mantazone bash --login -c '/opt/smartdc/manta-deployment/cmd/manta-replace-cert.js /var/tmp/stud.pem'
+        rm /zones/$mantazone/root/var/tmp/stud.pem
+        echo "OK: New Manta certificate deployed, but loadbalancers have not been restarted." >&2
+        echo "    You will need to visit each loadbalancer instance with manta-login and " >&2
+        echo "    restart the 'stud' service." >&2
+        ;;
+    *)
+        echo "ERROR: Unknown domain: ${domain}" >&2
+        exit 1
+        ;;
+    esac
 
 }
 
 function unchanged_cert {
-	local domain="${1}" keyfile="${2}" certfile="${3}" fullchainfile="${4}" chainfile="${5}"
+    local domain="${1}" keyfile="${2}" certfile="${3}" fullchainfile="${4}" chainfile="${5}"
 
-	local vmuuid
-	local certdir="$(dirname "$certfile")"
-	case "$(getservice "${domain}")" in
-	cloudapi)
-		vmuuid="$(vmadm lookup alias=cloudapi0)"
-		if [ ! -f "${certdir}/dhparams.pem" ]; then
-			openssl dhparam 2048 > "${certdir}/dhparams.pem"
-		fi
-		cat "${keyfile}" "${fullchainfile}" "${certdir}/dhparams.pem" > "${certdir}/stud.pem"
-		local target="/zones/${vmuuid}/root/opt/smartdc/cloudapi/ssl/stud.pem"
-		if ! diff "${certdir}/stud.pem" "${target}" >/dev/null; then
-			cp "${certdir}/stud.pem" "/zones/${vmuuid}/root/opt/smartdc/cloudapi/ssl/stud.pem"
-			zlogin "${vmuuid}" svcadm restart stud
-			echo "OK: cloudapi certificate deployed, and stud restarted" >&2
-		fi
-		echo "OK: cloudapi certificate up to date" >&2
-		;;
-	adminui)
-		vmuuid="$(vmadm lookup alias=adminui0)"
-		cat "${keyfile}" "${fullchainfile}" > "${certdir}/combined.pem"
-		local target="/zones/${vmuuid}/root/opt/smartdc/adminui/etc/ssl/default.pem"
-		if ! diff "${certdir}/combined.pem" "${target}" >/dev/null; then
-			cp "${certdir}/combined.pem" "/zones/${vmuuid}/root/opt/smartdc/adminui/etc/ssl/default.pem"
-			zlogin "${vmuuid}" svcadm restart adminui
-			echo "OK: adminui certificate deployed, and adminui restarted" >&2
-		fi
-		echo "OK: adminui certificate up to date" >&2
-		;;
-	sdcsso)
+    local vmuuid
+    local certdir="$(dirname "$certfile")"
+    case "$(getservice "${domain}")" in
+    cloudapi)
+        vmuuid="$(vmadm lookup alias=cloudapi0)"
+        if [ ! -f "${certdir}/dhparams.pem" ]; then
+            openssl dhparam 2048 > "${certdir}/dhparams.pem"
+        fi
+        cat "${keyfile}" "${fullchainfile}" "${certdir}/dhparams.pem" > "${certdir}/stud.pem"
+        local target="/zones/${vmuuid}/root/opt/smartdc/cloudapi/ssl/stud.pem"
+        if ! diff "${certdir}/stud.pem" "${target}" >/dev/null; then
+            cp "${certdir}/stud.pem" "/zones/${vmuuid}/root/opt/smartdc/cloudapi/ssl/stud.pem"
+            zlogin "${vmuuid}" svcadm restart stud
+            echo "OK: cloudapi certificate deployed, and stud restarted" >&2
+        fi
+        echo "OK: cloudapi certificate up to date" >&2
+        ;;
+    adminui)
+        vmuuid="$(vmadm lookup alias=adminui0)"
+        cat "${keyfile}" "${fullchainfile}" > "${certdir}/combined.pem"
+        local target="/zones/${vmuuid}/root/opt/smartdc/adminui/etc/ssl/default.pem"
+        if ! diff "${certdir}/combined.pem" "${target}" >/dev/null; then
+            cp "${certdir}/combined.pem" "/zones/${vmuuid}/root/opt/smartdc/adminui/etc/ssl/default.pem"
+            zlogin "${vmuuid}" svcadm restart adminui
+            echo "OK: adminui certificate deployed, and adminui restarted" >&2
+        fi
+        echo "OK: adminui certificate up to date" >&2
+        ;;
+    sdcsso)
                 vmuuid="$(vmadm lookup alias=sdcsso)"
                 local target="/zones/${vmuuid}/root/opt/smartdc/sdcsso/ssl/cert.pem"
                 local target_key="/zones/${vmuuid}/root/opt/smartdc/sdcsso/ssl/key.pem"
@@ -234,23 +234,23 @@ function unchanged_cert {
                 else
                         echo "OK: sdcsso certificate/key up to date" >&2
                 fi
-		;;
-	docker|manta)
-		echo "OK: certificate up to date" >&2
-		;;
-	*)
-		echo "ERROR: Unknown domain: ${domain}" >&2
-		exit 1
-		;;
-	esac
+        ;;
+    docker|manta)
+        echo "OK: certificate up to date" >&2
+        ;;
+    *)
+        echo "ERROR: Unknown domain: ${domain}" >&2
+        exit 1
+        ;;
+    esac
 }
 
 function exit_hook {
-	exit 0
+    exit 0
 }
 
 function invalid_challenge {
-	exit 0
+    exit 0
 }
 
 handler=$1
