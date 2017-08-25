@@ -212,6 +212,10 @@ function invalid_challenge {
 	exit 0
 }
 
+function startup_hook {
+	exit 0
+}
+
 handler=$1
 shift
 $handler $@
