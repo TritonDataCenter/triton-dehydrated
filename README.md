@@ -1,7 +1,7 @@
 ## triton dehydrated
 
 [dehydrated](https://github.com/lukas2511/dehydrated) hook script to set up
-certificates automatically for Triton, using DNS challenges. Enabled via CNS.
+certificates automatically for Triton, using DNS challenges. Requires CNS.
 
 To use this you need to have CNS set up and publically resolvable. Then, either
 fill `domains.txt` with the names of the CNS endpoints for the Triton services

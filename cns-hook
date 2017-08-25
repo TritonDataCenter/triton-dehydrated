@@ -1,16 +1,29 @@
 #!/usr/bin/env bash
 
 function getservice {
-	local domain="${1}"
-	if grep '^cloudapi\.' >/dev/null <<< "$domain"; then
-		echo "cloudapi"
-	elif grep '^adminui\.' >/dev/null <<< "$domain"; then
-		echo "adminui"
-	elif grep '^docker\.' >/dev/null <<< "$domain"; then
-		echo "docker"
-	elif grep 'manta' >/dev/null <<< "$domain"; then
-		echo "manta"
+	local vmuuid="$(dig +short txt "${domain}" @8.8.8.8 | head -1 | sed 's/"//g')"
+	if [ "a$vmuuid" == "a" ]; then
+		echo "ERROR: ${domain} does not appear to be a CNS name or CNAME to a CNS name" >&2
+		exit 1
 	fi
+	local sdcrole="$(sdc-vmadm get ${vmuuid} | json tags.smartdc_role)"
+	local mantarole="$(sdc-vmadm get ${vmuuid} | json tags.manta_role)"
+	case "$sdcrole" in
+		cloudapi|adminui|docker)
+			echo "$sdcrole"
+			;;
+		*)
+			case "$mantarole" in
+				loadbalancer)
+					echo "manta"
+					;;
+				*)
+					echo "ERROR: ${domain} points at VM ${vmuuid} with role ${role}, which is not supported" >&2
+					exit 1
+					;;
+			esac
+			;;
+	esac
 }
 
 function verifyvm {
