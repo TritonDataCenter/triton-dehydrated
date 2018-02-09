@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 function getservice {
-	local vmuuid="$(dig +short txt "${domain}" @8.8.8.8 | head -1 | sed 's/"//g')"
+	local vmuuid="$(dig +short txt "${domain}" @8.8.8.8 | tail -1 | sed 's/"//g')"
 	if [ "a$vmuuid" == "a" ]; then
 		echo "ERROR: ${domain} does not appear to be a CNS name or CNAME to a CNS name" >&2
 		exit 1
