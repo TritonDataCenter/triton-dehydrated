@@ -107,5 +107,10 @@ Now you will find your certificate files in `./certs/blog.example.com/`. You
 should configure your webserver to get the private key and certificate file
 (with chain) directly from this folder.
 
+You can also create override hooks in a file named `override-hook`. The format
+for this file is the same as for `dehydrated`'s hook file but should only have
+the `deploy_cert` and/or `unchanged_cert` functions. Use override hooks in a
+zone to do things like restart local services.
+
 Finally, you can set up a cron job to re-run `./dehydrated -c` at least once a
 week (and then do a graceful reload of your web server configuration).
