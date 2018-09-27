@@ -1,0 +1,27 @@
+# This file is for serivces that should use an ECDSA certificate. Currently,
+# this is strongly recomended for CMON. Docker and AdminUI may also use ECDSA
+# but by default will use RSA. CloudAPI and Manta, due to their use of stud,
+# will crash if supplied with an ECDSA certificate.
+#
+# To deploy an ECDSA certificate for cmon, create `domains.ecdsa.txt` with the
+# name of your cmon zone (including a wildcard name). E.g.:
+#
+#    cmon.datacenter.example.com *.cmon.datacenter.example.com
+#
+# Note: cmon can only use the DNS name provided by CNS for the external
+# interface. Vanity, or alternative DNS names are not supported by CMON.
+#
+# Then run dehydrated with this config file
+#
+#     ./dehydrated -c -f config.ecdsa
+#
+# Be sure to create a cron job for your ecdsa certificates as well!
+
+# Import the default settings
+source ${BASEDIR}/config
+
+# File containing the list of domains to request ECDSA certificates for
+DOMAINS_TXT="${BASEDIR}/domains.ecdsa.txt"
+
+# Use ECDSA curve prime256v1. You may also choose to use curve secp384r1.
+KEY_ALGO=prime256v1

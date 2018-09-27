@@ -7,7 +7,7 @@ function getservice {
 	local sdcrole="$(sdc-vmadm get ${vmuuid} | json tags.smartdc_role)"
 	local mantarole="$(sdc-vmadm get ${vmuuid} | json tags.manta_role)"
 	case "$sdcrole" in
-		cloudapi|adminui|docker)
+		cloudapi|adminui|docker|cmon)
 			echo "$sdcrole"
 			;;
 		*)
@@ -47,7 +47,7 @@ function waitfortxt {
 	local domain="$1" txtval="$2"
 	local count=0
 	while [ $count -lt 10 ]; do
-		if dig +short txt "_acme-challenge.${domain}" @8.8.8.8 | grep -- "${txtval}" >/dev/null; then
+		if dig +short txt "_acme-challenge.${domain}" @8.8.8.8 | grep -f <(tr ' ' '\n' <<< "${txtval}") >/dev/null; then
 			count=$(($count + 1))
 		else
 			count=0
@@ -71,51 +71,89 @@ function update_remotevm {
 		sdc-vmadm update $vmuuid
 }
 
+function find_path {
+    local path="$1"
+    if [ ! -e "$path" ]; then
+        path=/native/$1
+        if [ ! -e "$path" ]; then
+            echo "ERROR: failed to find $(basename $path) command" >&2
+            echo "       is this a Triton zone?" >&2
+            exit 1
+        fi
+    fi
+    cmd="$path"
+    if [ -e "/usr/bin/pfexec" ]; then
+        cmd="/usr/bin/pfexec ${cmd}"
+    fi
+    echo "$cmd"
+}
+
+function mdata_get {
+    local cmd=$(find_path /usr/sbin/mdata-get)
+    $cmd "$@"
+}
+
 function mdata_put {
-	local path=/usr/sbin/mdata-put
-	if [ ! -e "$path" ]; then
-		path=/native/usr/sbin/mdata-put
-		if [ ! -e "$path" ]; then
-			echo "ERROR: failed to find mdata-put command" >&2
-			echo "       is this a Triton zone?" >&2
-			exit 1
-		fi
-	fi
-	cmd="$path"
-	if [ -e "/usr/bin/pfexec" ]; then
-		cmd="/usr/bin/pfexec ${cmd}"
-	fi
-	$cmd "$@"
+    local cmd=$(find_path /usr/sbin/mdata-put)
+    $cmd "$@"
 }
 
 function mdata_delete {
-	local path=/usr/sbin/mdata-delete
-	if [ ! -e "$path" ]; then
-		path=/native/usr/sbin/mdata-delete
-		if [ ! -e "$path" ]; then
-			echo "ERROR: failed to find mdata-delete command" >&2
-			echo "       is this a Triton zone?" >&2
-			exit 1
-		fi
-	fi
-	cmd="$path"
-	if [ -e "/usr/bin/pfexec" ]; then
-		cmd="/usr/bin/pfexec ${cmd}"
-	fi
+    local cmd=$(find_path /usr/sbin/mdata-delete)
 	$cmd "$@"
+}
+
+function get_zonename {
+    local cmd=$(find_path /usr/bin/zonename)
+    $cmd
+}
+
+function merge_token {
+	local domain="${1}" tokenval="${2}"
+	local existing_token
+
+	local zname=$(get_zonename)
+	if [ "$zname" != "global" ]; then
+		existing_token=$(mdata_get triton.cns.acme-challenge)
+	else
+		local vmservice vmuuid
+		vmservice=$(getservice "${domain}")
+		case "$vmservice" in
+		cloudapi|adminui|docker|cmon)
+			vmuuid="$(vmadm lookup alias=~${vmservice})"
+			existing_token=$(vmadm get "$vmuuid" | json 'customer_metadata.["triton.cns.acme-challenge"]')
+			;;
+		manta)
+			local poseidon=$(sdc-useradm get poseidon | json uuid)
+			vmuuid=$(sdc-vmadm list -H -o uuid \
+				owner_uuid="$poseidon" alias="loadbalancer" | \
+				sort | tail -1)
+			existing_token=$(sdc-vmapi "/vms/$vmuuid" | json -H 'customer_metadata.["triton.cns.acme-challenge"]')
+			;;
+		esac
+	fi
+
+	if [ -n "$existing_token" ]; then
+		new_token=$(echo "$existing_token $tokenval" | tr ' ' '\n' | sort -u | xargs)
+	else
+		new_token="$tokenval"
+	fi
+	echo "$new_token"
 }
 
 function deploy_challenge {
 	local domain="${1}" tokenfn="${2}" tokenval="${3}"
 
-	local zname=$(zonename)
+	tokenval=$(merge_token "$domain" "$tokenval")
+
+	local zname=$(get_zonename)
 	if [ "$zname" != "global" ]; then
 		verifyvm "$domain" "$zname"
 		mdata_put "triton.cns.acme-challenge" "$tokenval"
 	else
 		local vmuuid
 		case "$(getservice "${domain}")" in
-		cloudapi|adminui|docker)
+		cloudapi|adminui|docker|cmon)
 			local alias="$(getservice "${domain}")0"
 			vmuuid="$(vmadm lookup alias=$alias)"
 			verifyvm "$domain" "$vmuuid"
@@ -125,7 +163,7 @@ function deploy_challenge {
 			local poseidon=$(sdc-useradm get poseidon | json uuid)
 			vmuuid=$(sdc-vmadm list -H -o uuid \
 				owner_uuid="$poseidon" alias="loadbalancer" | \
-				tail -1)
+				sort | tail -1)
 			verifyvm "$domain" "$vmuuid"
 			update_remotevm "$vmuuid" "$tokenval"
 			;;
@@ -145,14 +183,14 @@ function deploy_challenge {
 function clean_challenge {
 	local domain="${1}" tokenfn="${2}" tokenval="${3}"
 
-	local zname=$(zonename)
+	local zname=$(get_zonename)
 	if [ "$zname" != "global" ]; then
 		verifyvm "$domain" "$zname"
 		mdata_delete "triton.cns.acme-challenge"
 	else
 		local vmuuid
 		case "$(getservice "${domain}")" in
-		cloudapi|adminui|docker)
+		cloudapi|adminui|docker|cmon)
 			local alias="$(getservice "${domain}")0"
 			vmuuid="$(vmadm lookup alias=$alias)"
 			verifyvm "$domain" "$vmuuid"
@@ -168,7 +206,7 @@ function clean_challenge {
 function deploy_cert {
 	local domain="${1}" keyfile="${2}" certfile="${3}" fullchainfile="${4}" chainfile="${5}"
 
-	local zname=$(zonename)
+	local zname=$(get_zonename)
 	if [ "$zname" != "global" ]; then
 		exit 0
 	fi
@@ -212,6 +250,18 @@ function deploy_cert {
 			sapiadm update $cloudapi_svc
 		echo "OK: docker certificate deployed" >&2
 		;;
+	cmon)
+		cmon_servers=($(sdcadm insts cmon -Ho server))
+		cmon_servers=$(tr ' ' , <<< "${cmon_servers[@]}")
+
+		sdc-oneachnode -n "$cmon_servers" -X -g "${fullchainfile}" -d /tmp
+		sdc-oneachnode -n "$cmon_servers" -X -g "${keyfile}" -d /tmp
+		sdc-oneachnode -n "$cmon_servers" '
+		mv /tmp/fullchain.pem /zones/$(vmadm lookup alias=~cmon)/root/data/tls/cert.pem
+		mv /tmp/privkey.pem /zones/$(vmadm lookup alias=~cmon)/root/data/tls/key.pem
+		svcadm -z $(vmadm lookup alias=~cmon) restart cmon
+		'
+		;;
 	manta)
 		if [ ! -f "${certdir}/dhparams.pem" ]; then
 			openssl dhparam 2048 > "${certdir}/dhparams.pem"
@@ -236,7 +286,7 @@ function deploy_cert {
 function unchanged_cert {
 	local domain="${1}" keyfile="${2}" certfile="${3}" fullchainfile="${4}" chainfile="${5}"
 
-	local zname=$(zonename)
+	local zname=$(get_zonename)
 	if [ "$zname" != "global" ]; then
 		exit 0
 	fi
@@ -274,7 +324,7 @@ function unchanged_cert {
 		fi
 		echo "OK: adminui certificate up to date" >&2
 		;;
-	docker|manta)
+	cmon|docker|manta)
 		echo "OK: certificate up to date" >&2
 		;;
 	*)
