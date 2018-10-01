@@ -8,8 +8,12 @@ $(ARCHIVE): $(SCRIPT)
 	find . -type f \
 	    -not -path '*/.git/*' \
 	    -not -name '.git*' \
-	    -not -name '.travis.yml' | \
+	    -not -name '.travis.yml' \
+	    -not -name '$(ARCHIVE)' | \
 	        xargs tar -czf "$@"
 
 $(SCRIPT):
 	git submodule init && git submodule update
+
+clean:
+	rm $(ARCHIVE)
