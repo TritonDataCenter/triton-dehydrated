@@ -81,5 +81,5 @@ EOF
 	curl -o "$SCRIPTDIR/cacert.pem" https://curl.haxx.se/ca/cacert.pem
 fi
 
-exec $SCRIPTDIR/deps/dehydrated/dehydrated "$@"
+source $SCRIPTDIR/deps/dehydrated/dehydrated
 
