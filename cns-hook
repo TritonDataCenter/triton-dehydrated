@@ -5,6 +5,11 @@ if [[ -f "${BASEDIR}/override-hook" ]]; then
     source "${BASEDIR}/override-hook"
 fi
 
-handler=$1
+# Protection for unknown functions, required by dehydrated.
+valid_passthrough_hooks=$(grep function ${BASEDIR}/cns-hook-util | awk '{print $2}')
+
+handler="$1"
 shift
-$handler $@
+if grep "$handler" <<< "$valid_passthrough_hooks"; then
+    "$handler" "$@"
+fi
