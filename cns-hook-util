@@ -27,7 +27,7 @@ function getservice {
 function verifyvm {
 	local domain="${1}" vmuuid="${2}"
 
-	if ! dig +short txt "${domain}" @8.8.8.8 | sed 's/"//g' | grep -- "^${vmuuid}" >/dev/null; then
+	if ! dig +short txt "${domain}" @8.8.8.8 | sed 's/"//g' | grep -w -- "${vmuuid}" >/dev/null; then
 		echo "ERROR: ${domain} does not appear to be a CNS name or CNAME to a CNS name for VM ${vmuuid}" >&2
 		exit 1
 	fi
