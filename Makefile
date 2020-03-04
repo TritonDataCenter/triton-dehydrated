@@ -4,7 +4,11 @@ ARCHIVE=	dehydrated.tar.gz
 .PHONY: archive
 archive: $(ARCHIVE)
 
-$(ARCHIVE): $(SCRIPT)
+.version: $(SCRIPT) dehydrated
+	git tag | sort | tail -1 > $@
+	git rev-parse HEAD 2>/dev/null >> $@
+
+$(ARCHIVE): $(SCRIPT) .version
 	find . -type f \
 	    -not -path '*/.git/*' \
 	    -not -name '.git*' \
