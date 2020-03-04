@@ -44,16 +44,21 @@ function verifyvm {
 }
 
 function waitfortxt {
-	local domain="$1" txtval="$2"
-	local count=0
-	while [ $count -lt 10 ]; do
-		if dig +short txt "_acme-challenge.${domain}" @8.8.8.8 | grep -f <(tr ' ' '\n' <<< "${txtval}") >/dev/null; then
-			count=$(($count + 1))
-		else
-			count=0
-			sleep 1
-		fi
-	done
+        local domain="$1" txtval="$2"
+        local count=0
+        read -r -a values <<< "$txtval"
+        for val in "${values[@]}"; do
+                while [ $count -lt 3 ]; do
+                        dig +short txt "_acme-challenge.${domain}" @8.8.8.8
+                        if dig +short txt "_acme-challenge.${domain}" @8.8.8.8 | grep -w "$val" >/dev/null; then
+                                count=$(($count + 1))
+                        else
+                                count=0
+                                sleep 1
+                        fi
+                done
+                count=0
+        done
 }
 
 function update_localvm {
