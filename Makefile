@@ -1,6 +1,9 @@
 SCRIPT=		deps/dehydrated/dehydrated
 ARCHIVE=	dehydrated.tar.gz
 
+# Prevent macOS from putting resource forks in the tar
+export COPYFILE_DISABLE=true
+
 .PHONY: archive
 archive: $(ARCHIVE)
 
