@@ -15,6 +15,9 @@
 # default: <unset>
 #IP_VERSION=
 
+# Proxy server to use for letsencrypt.org APIs
+#CURL_OPTS="-x http://proxy:3128"
+
 # Path to certificate authority (default: https://acme-v02.api.letsencrypt.org/directory)
 #CA="https://acme-v02.api.letsencrypt.org/directory"
 #CA="https://acme-staging-v02.api.letsencrypt.org/directory"
@@ -88,6 +91,6 @@ KEY_ALGO=rsa
 # Option to add CSR-flag indicating OCSP stapling to be mandatory (default: no)
 #OCSP_MUST_STAPLE="no"
 
-if [[ -f config.overrides ]]; then
-    source config.overrides
+if [[ -f $SCRIPTDIR/config.overrides ]]; then
+    source $SCRIPTDIR/config.overrides
 fi
