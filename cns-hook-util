@@ -49,8 +49,7 @@ function waitfortxt {
         read -r -a values <<< "$txtval"
         for val in "${values[@]}"; do
                 while [ $count -lt 3 ]; do
-                        dig +short txt "_acme-challenge.${domain}" @${NAMESERVER:-8.8.8.8}
-                        if dig +short txt "_acme-challenge.${domain}" @${NAMESERVER:-8.8.8.8} | grep -w "$val" >/dev/null; then
+                        if dig +short txt "_acme-challenge.${domain}" @${NAMESERVER:-8.8.8.8} | fgrep -- "$val" >/dev/null; then
                                 count=$(($count + 1))
                         else
                                 count=0
