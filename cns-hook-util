@@ -108,9 +108,10 @@ function mdata_delete {
 }
 
 function get_zonename {
-    local cmd=$(find_path /usr/bin/zonename)
-    $cmd
+    local cmd=$(mdata_get sdc:uuid)
+        echo $cmd
 }
+
 
 function merge_token {
 	local domain="${1}" tokenval="${2}"
