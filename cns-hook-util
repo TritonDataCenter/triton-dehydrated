@@ -108,8 +108,14 @@ function mdata_delete {
 }
 
 function get_zonename {
-    local cmd=$(find_path /usr/bin/zonename)
-    $cmd
+    # HVM zones won't have a zonename command.
+    uname_v=$(uname -v)
+    if [[ $uname_v =~ joyent ]]; then
+        local cmd=$(find_path /usr/bin/zonename)
+        $cmd
+    else
+        mdata_get sdc:zonename
+    fi
 }
 
 function merge_token {
