@@ -229,14 +229,10 @@ function deploy_cert {
 		if [ ! -f "${certdir}/dhparams.pem" ]; then
 			openssl dhparam 2048 > "${certdir}/dhparams.pem"
 		fi
-		cat "${keyfile}" "${fullchainfile}" "${certdir}/dhparams.pem" > "${certdir}/stud.pem"
-		local subd="$(cat "${certdir}/stud.pem" | tr '\n' '\\' | sed 's/\\/\\n/g')"
-		local muuid
-		read muuid < <(sdc-sapi /manifests -XPOST -d '{"name": "cert", "version":"1.0.0", "path": "/opt/smartdc/cloudapi/ssl/stud.pem","post_cmd":"/usr/sbin/svcadm restart stud","template":"'"${subd}"'"}' | json -H uuid)
-		local svcuuid
-		read svcuuid < <(sdc-sapi /services?name=cloudapi | json -Ha uuid)
-		sdc-sapi /services/${svcuuid} -XPUT -d '{"manifests":{"cert":"'"${muuid}"'"}}' >/dev/null
-		echo "OK: cloudapi certificate deployed (sapi manifest updated)" >&2
+		cat "${keyfile}" "${fullchainfile}" "${certdir}/dhparams.pem" > "${certdir}/cert.pem"
+		cp "${certder}/cert.pem" "/zones/${vmuuid}/root/data/tls/cert.pem"
+		zlogin "${vmuuid}" svcadm restart haproxy
+		echo "OK: cloudapi certificate deployed and haproxy restarted" >&2
 		;;
 	adminui)
 		vmuuid="$(vmadm lookup alias=adminui0)"
@@ -309,15 +305,11 @@ function unchanged_cert {
 		if [ ! -f "${certdir}/dhparams.pem" ]; then
 			openssl dhparam 2048 > "${certdir}/dhparams.pem"
 		fi
-		cat "${keyfile}" "${fullchainfile}" "${certdir}/dhparams.pem" > "${certdir}/stud.pem"
-		local target="/zones/${vmuuid}/root/opt/smartdc/cloudapi/ssl/stud.pem"
-		if ! diff "${certdir}/stud.pem" "${target}" >/dev/null; then
-			local subd="$(cat "${certdir}/stud.pem" | tr '\n' '\\' | sed 's/\\/\\n/g')"
-			local muuid
-			read muuid < <(sdc-sapi /manifests -XPOST -d '{"name": "cert", "version":"1.0.0", "path": "/opt/smartdc/cloudapi/ssl/stud.pem","post_cmd":"/usr/sbin/svcadm restart stud","template":"'"${subd}"'"}' | json -H uuid)
-			local svcuuid
-			read svcuuid < <(sdc-sapi /services?name=cloudapi | json -Ha uuid)
-			sdc-sapi /services/${svcuuid} -XPUT -d '{"manifests":{"cert":"'"${muuid}"'"}}' >/dev/null
+		cat "${keyfile}" "${fullchainfile}" "${certdir}/dhparams.pem" > "${certdir}/cert.pem"
+		local target="/zones/${vmuuid}/root/data/tls/cert.pem"
+		if ! diff "${certdir}/cert.pem" "${target}" >/dev/null; then
+			cp "${certdir}/cert.pem" "${target}"
+			zlogin "${vmuuid}" svcadm restart haproxy
 			echo "OK: cloudapi certificate deployed (sapi manifest updated)" >&2
 		fi
 		echo "OK: cloudapi certificate up to date" >&2
@@ -327,7 +319,7 @@ function unchanged_cert {
 		cat "${keyfile}" "${fullchainfile}" > "${certdir}/combined.pem"
 		local target="/zones/${vmuuid}/root/opt/smartdc/adminui/etc/ssl/default.pem"
 		if ! diff "${certdir}/combined.pem" "${target}" >/dev/null; then
-			cp "${certdir}/combined.pem" "/zones/${vmuuid}/root/opt/smartdc/adminui/etc/ssl/default.pem"
+			cp "${certdir}/combined.pem" "${target}"
 			rm /zones/${vmuuid}/root/opt/smartdc/adminui/etc/ssl/ADMINUI.*
 			zlogin "${vmuuid}" svcadm restart adminui
 			echo "OK: adminui certificate deployed, and adminui restarted" >&2
