@@ -27,4 +27,4 @@ $(SCRIPT):
 	git submodule init && git submodule update
 
 clean:
-	rm $(ARCHIVE)
+	rm .version $(ARCHIVE) || true
