@@ -2,7 +2,9 @@ function getservice {
 	local vmuuid="$(dig +short txt "${domain}" @${NAMESERVER:-8.8.8.8} | tail -1 | sed 's/"//g')"
 	if [ "a$vmuuid" == "a" ]; then
 		echo "ERROR: ${domain} does not appear to be a CNS name or CNAME to a CNS name" >&2
-		exit 1
+                if [[ -z SKIP_VERIFY ]]; then
+                    exit 1
+                fi
 	fi
 	local sdcrole="$(sdc-vmadm get ${vmuuid} | json tags.smartdc_role)"
 	local mantarole="$(sdc-vmadm get ${vmuuid} | json tags.manta_role)"
@@ -37,7 +39,9 @@ function verifyvm {
 		local acmecname="$(dig +short cname "_acme-challenge.${domain}" @${NAMESERVER:-8.8.8.8})"
 		if [ "a$acmecname" == "a" ]; then
 			echo "ERROR: ${domain} is a CNAME to ${cname}, but _acme-challenge.${domain} is not a CNAME" >&2
-			exit 1
+                        if [[ -z SKIP_VERIFY ]]; then
+                            exit 1
+                        fi
 		fi
 	fi
 
