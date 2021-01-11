@@ -236,7 +236,7 @@ function deploy_cert {
             openssl dhparam 2048 > "${certdir}/dhparams.pem"
         fi
         cat "${keyfile}" "${fullchainfile}" "${certdir}/dhparams.pem" > "${certdir}/cert.pem"
-        cp "${certder}/cert.pem" "/zones/${vmuuid}/root/data/tls/cert.pem"
+        cp "${certdir}/cert.pem" "/zones/${vmuuid}/root/data/tls/cert.pem"
         zlogin "${vmuuid}" svcadm restart haproxy
         echo "OK: cloudapi certificate deployed and haproxy restarted" >&2
         ;;
