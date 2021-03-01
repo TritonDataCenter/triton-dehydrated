@@ -99,15 +99,21 @@ should work on LX-branded zones as well.
     us-west-1.triton.zone
     ```
  2. Find the CNS-generated name for your container. One way to do this is
-    to look at the output of `triton inst get <instance>` for the `dns_names`
-    array. As an example, let's consider
+    to look for the `dns_names` array in the output of
+    ```shell
+    triton inst get <instance>
+    ```
+    As an example, let's consider
     ```
     blog.svc.3c330096-89e6-11e7-9f13-23d71a63353e.us-west-1.triton.zone
     ```
  3. Set up your desired DNS name as a CNAME to this CNS-generated name. If you
     are hosting the root of your domain, it's also fine to just set up a
     regular A record instead, as long as you also deploy a TXT record
-    containing the full UUID of the container. We'll use `blog.example.com`
+    containing the full UUID of the container. We'll use
+    ```
+    blog.example.com
+    ```
     and CNAME it to
     ```
     blog.svc.3c330096-89e6-11e7-9f13-23d71a63353e.us-west-1.triton.zone
