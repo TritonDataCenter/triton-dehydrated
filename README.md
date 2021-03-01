@@ -39,16 +39,10 @@ certificates automatically for Triton, using DNS challenges. Requires CNS.
 
     List on each line the DNS name you've chosen to use for that service (e.g.
     `cloudapi.dc1.cns.example.com` or `dc1.api.example.com`)
- 6. Set up your **Let's Encrypt** account keys by running:
+ 6. Now get your first set of RSA certificates.
 
     ```shell
-    /opt/dehydrated/dehydrated --register --accept-terms
-    ```
-
- 7. Now get your first set of RSA certificates.
-
-    ```shell
-        [root@headnode (emy-15) ~]$ /opt/dehydrated/dehydrated -c
+        [root@headnode (emy-15) ~]$ /opt/dehydrated/dehydrated -c --accept-terms
         # INFO: Using main config file /opt/dehydrated/config
         Processing adminui.emy-15.cns.joyent.us
          + Generating private key...
@@ -100,31 +94,45 @@ should work on LX-branded zones as well.
     deployment (see
     [the CNS operator guide](https://github.com/joyent/triton-cns/blob/master/docs/operator-guide.md)).
     We'll assume for the sake of example here that the CNS suffix for the
-    DC is `us-west-1.triton.zone`.
+    DC is
+    ```
+    us-west-1.triton.zone
+    ```
  2. Find the CNS-generated name for your container. One way to do this is
     to look at the output of `triton inst get <instance>` for the `dns_names`
     array. As an example, let's consider
-    `blog.svc.3c330096-89e6-11e7-9f13-23d71a63353e.us-west-1.triton.zone`.
+    ```
+    blog.svc.3c330096-89e6-11e7-9f13-23d71a63353e.us-west-1.triton.zone
+    ```
  3. Set up your desired DNS name as a CNAME to this CNS-generated name. If you
     are hosting the root of your domain, it's also fine to just set up a
     regular A record instead, as long as you also deploy a TXT record
     containing the full UUID of the container. We'll use `blog.example.com`
     and CNAME it to
-    `blog.svc.3c330096-89e6-11e7-9f13-23d71a63353e.us-west-1.triton.zone`.
+    ```
+    blog.svc.3c330096-89e6-11e7-9f13-23d71a63353e.us-west-1.triton.zone
+    ```
  4. Set up `_acme-challenge.<domain>` as a CNAME to
     `_acme-challenge.<cnsdomain>`. We'll set up
-    `_acme-challenge.blog.example.com` as a CNAME to
-    `_acme-challenge.blog.svc.3c330096-89e6-11e7-9f13-23d71a63353e.us-west-1.triton.zone`.
+    ```
+    _acme-challenge.blog.example.com
+    ```
+    as a CNAME to
+    ```
+    _acme-challenge.blog.svc.3c330096-89e6-11e7-9f13-23d71a63353e.us-west-1.triton.zone
+    ```
  5. Inside the container, download and extract the `dehydrated.tar.gz` file
     from the [latest GitHub release](https://github.com/joyent/triton-dehydrated/releases/)
     into a directory.
  6. Create a new file `domains.txt` in the directory containing just one line
-    with the full domain name you want on the certificate (e.g.
-    `blog.example.com`).
- 7. Register with the **Let's Encrypt** server by running
-    `./dehydrated --register --accept-terms`
- 8. Get the first certificate by running
-    `./dehydrated -c`
+    with the full domain name you want on the certificate, e.g.
+    ```
+    blog.example.com
+    ```
+ 7. Get the first certificate by running
+    ```shell
+    ./dehydrated -c --accept-terms
+    ```
 
 Now you will find your certificate files in `./certs/blog.example.com/`. You
 should configure your webserver to get the private key and certificate file
