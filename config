@@ -119,10 +119,6 @@ KEY_ALGO=rsa
 # OCSP refresh interval (default: 5 days)
 #OCSP_DAYS=5
 
-if [[ -f $SCRIPTDIR/config.overrides ]]; then
-    source $SCRIPTDIR/config.overrides
-fi
-
 # Issuer chain cache directory (default: $BASEDIR/chains)
 #CHAINCACHE="${BASEDIR}/chains"
 
@@ -134,3 +130,7 @@ fi
 
 # Preferred issuer chain (default: <unset> -> uses default chain)
 #PREFERRED_CHAIN=
+
+if [[ -f $SCRIPTDIR/config.overrides ]]; then
+    source $SCRIPTDIR/config.overrides
+fi
