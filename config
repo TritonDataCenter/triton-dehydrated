@@ -75,7 +75,8 @@ CHALLENGETYPE="dns-01"
 #OPENSSL="openssl"
 
 # Extra options passed to the curl binary (default: <unset>)
-#CURL_OPTS=
+# E.g. Proxy server to use for letsencrypt.org APIs
+#CURL_OPTS="-x http://proxy:3128"
 
 # Program or function called in certain situations
 #
