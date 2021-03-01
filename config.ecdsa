@@ -23,5 +23,5 @@ source ${BASEDIR}/config
 # File containing the list of domains to request ECDSA certificates for
 DOMAINS_TXT="${BASEDIR}/domains.ecdsa.txt"
 
-# Use ECDSA curve prime256v1. You may also choose to use curve secp384r1.
-KEY_ALGO=prime256v1
+# Use ECDSA curve secp384r1. You may also choose to use curve prime256v1.
+KEY_ALGO=secp384r1
