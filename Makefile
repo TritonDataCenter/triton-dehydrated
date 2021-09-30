@@ -15,7 +15,7 @@ release: clean .version $(ARCHIVE)
 	echo "$(VERSION)" > $@
 	git rev-parse HEAD 2>/dev/null >> $@
 
-$(ARCHIVE): $(SCRIPT) .version
+$(ARCHIVE): $(SCRIPT) patch .version
 	find . -type f \
 	    -not -path '*/.git/*' \
 	    -not -name '.git*' \
