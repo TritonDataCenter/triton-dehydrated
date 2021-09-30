@@ -91,6 +91,9 @@ KEY_ALGO=rsa
 # Option to add CSR-flag indicating OCSP stapling to be mandatory (default: no)
 #OCSP_MUST_STAPLE="no"
 
+# Force dehydrated to use an acceptable chain.
+PREFERRED_CHAIN='ISRG Root X1'
+
 if [[ -f $SCRIPTDIR/config.overrides ]]; then
     source $SCRIPTDIR/config.overrides
 fi
