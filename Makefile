@@ -5,7 +5,7 @@ VERSION=	$(shell git tag --sort=taggerdate | tail -1)
 # Prevent macOS from putting resource forks in the tar
 export COPYFILE_DISABLE=true
 
-.PHONY: archive release
+.PHONY: archive patch release subclean
 archive: $(ARCHIVE)
 
 release: clean .version $(ARCHIVE)
@@ -29,8 +29,10 @@ $(SCRIPT):
 # This is a temporary hack to work around an upstream bug. We want a better
 # way to handle this.
 patch: $(SCRIPT)
-	git submodule foreach --recursive git reset --hard
 	patch -p1 $< < PATCHES/000-fix-grep.patch
 
-clean:
+subclean:
+	git submodule foreach --recursive git reset --hard
+
+clean: subclean
 	rm .version $(ARCHIVE) || true
