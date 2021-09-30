@@ -3,6 +3,12 @@
 [dehydrated](https://github.com/lukas2511/dehydrated) hook script to set up
 certificates automatically for Triton, using DNS challenges. Requires CNS.
 
+## Before You Begin
+
+Due to recent changes with dehydrated upstream, you will either need to run
+this on platform `20200423` or later, *or* have `grep` (i.e., gnu-grep)
+installed from pkgsrc or pkgsrc-tools.
+
 ## How to use: headnode services (CloudAPI etc)
 
  1. Set up CNS in your Triton deployment (see

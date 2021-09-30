@@ -1,12 +1,17 @@
 #!/usr/bin/env bash
 
+# Ensure BSEDIR is relative to this script.
+BASEDIR="${BASH_SOURCE[0]%/*}"
+
 source "${BASEDIR}/cns-hook-util"
 if [[ -f "${BASEDIR}/override-hook" ]]; then
+    # shellcheck disable=SC1091
     source "${BASEDIR}/override-hook"
 fi
 
 # Protection for unknown functions, required by dehydrated.
-valid_passthrough_hooks=$(grep function ${BASEDIR}/cns-hook-util | awk '{print $2}')
+# shellcheck source=cns-hook-util
+valid_passthrough_hooks=$(grep function "${BASEDIR}/cns-hook-util" | awk '{print $2}')
 
 handler="$1"
 shift
