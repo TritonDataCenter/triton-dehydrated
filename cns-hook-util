@@ -9,7 +9,7 @@ function getservice {
     local sdcrole="$(sdc-vmadm get ${vmuuid} | json tags.smartdc_role)"
     local mantarole="$(sdc-vmadm get ${vmuuid} | json tags.manta_role)"
     case "$sdcrole" in
-        cloudapi|adminui|docker|cmon)
+        cloudapi|adminui|docker|cmon|grafana)
             echo "$sdcrole"
             ;;
         *)
@@ -135,7 +135,7 @@ function merge_token {
         local vmservice vmuuid
         vmservice=$(getservice "${domain}")
         case "$vmservice" in
-        cloudapi|adminui|docker|cmon)
+        cloudapi|adminui|docker|cmon|grafana)
             vmuuid="$(vmadm lookup alias=~${vmservice})"
             existing_token=$(vmadm get "$vmuuid" | json 'customer_metadata.["triton.cns.acme-challenge"]')
             ;;
@@ -169,7 +169,7 @@ function deploy_challenge {
     else
         local vmuuid
         case "$(getservice "${domain}")" in
-        cloudapi|adminui|docker|cmon)
+        cloudapi|adminui|docker|cmon|grafana)
             local alias="$(getservice "${domain}")0"
             vmuuid="$(vmadm lookup alias=$alias)"
             verifyvm "$domain" "$vmuuid"
@@ -206,7 +206,7 @@ function clean_challenge {
     else
         local vmuuid
         case "$(getservice "${domain}")" in
-        cloudapi|adminui|docker|cmon)
+        cloudapi|adminui|docker|cmon|grafana)
             local alias="$(getservice "${domain}")0"
             vmuuid="$(vmadm lookup alias=$alias)"
             verifyvm "$domain" "$vmuuid"
@@ -274,7 +274,19 @@ function deploy_cert {
         svcadm -z $(vmadm lookup alias=~cmon) restart cmon
         '
         ;;
-    manta)
+	grafana)
+        grafana_servers=($(sdcadm insts grafana -Ho server))
+        grafana_servers=$(tr ' ' , <<< "${grafana_servers[@]}")
+
+        sdc-oneachnode -n "$grafana_servers" -X -g "${fullchainfile}" -d /tmp
+        sdc-oneachnode -n "$grafana_servers" -X -g "${keyfile}" -d /tmp
+        sdc-oneachnode -n "$grafana_servers" '
+        mv /tmp/fullchain.pem /zones/$(vmadm lookup alias=~grafana)/root/data/grafana/tls/cert.pem
+        mv /tmp/privkey.pem /zones/$(vmadm lookup alias=~grafana)/root/data/grafana/tls/key.pem
+        svcadm -z $(vmadm lookup alias=~grafana) restart nginx
+        '
+        ;;
+	manta)
         if [ ! -f "${certdir}/dhparams.pem" ]; then
             openssl dhparam 2048 > "${certdir}/dhparams.pem"
         fi
@@ -292,7 +304,6 @@ function deploy_cert {
         exit 1
         ;;
     esac
-
 }
 
 function unchanged_cert {
@@ -340,6 +351,7 @@ function unchanged_cert {
         exit 1
         ;;
     esac
+
 }
 
 function exit_hook {
