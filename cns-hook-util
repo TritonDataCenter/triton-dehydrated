@@ -343,7 +343,7 @@ function unchanged_cert {
         fi
         echo "OK: adminui certificate up to date" >&2
         ;;
-    cmon|docker|manta)
+    cmon|docker|manta|grafana)
         echo "OK: certificate up to date" >&2
         ;;
     *)
@@ -351,7 +351,6 @@ function unchanged_cert {
         exit 1
         ;;
     esac
-
 }
 
 function exit_hook {
