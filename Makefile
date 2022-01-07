@@ -1,3 +1,9 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+# Copyright 2021 Joyent, Inc.
+
 SCRIPT=		deps/dehydrated/dehydrated
 ARCHIVE=	dehydrated.tar.gz
 VERSION=	$(shell git tag --sort=taggerdate | tail -1)
@@ -15,11 +21,13 @@ release: clean .version $(ARCHIVE)
 	echo "$(VERSION)" > $@
 	git rev-parse HEAD 2>/dev/null >> $@
 
-$(ARCHIVE): $(SCRIPT) patch .version
+$(ARCHIVE): clean $(SCRIPT) patch .version
 	find . -type f \
 	    -not -path '*/.git/*' \
+	    -not -path '*/PATCHES/*' \
 	    -not -name '.git*' \
 	    -not -name '.travis.yml' \
+	    -not -name 'Makefile' \
 	    -not -name '$(ARCHIVE)' | \
 	        xargs tar -czf "$@"
 
@@ -35,4 +43,4 @@ subclean:
 	git submodule foreach --recursive git reset --hard
 
 clean: subclean
-	rm .version $(ARCHIVE) || true
+	rm -rf .version $(ARCHIVE) accounts certs || true

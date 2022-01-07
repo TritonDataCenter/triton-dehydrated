@@ -1,13 +1,25 @@
+# shellcheck shell=bash
+
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+# Copyright 2021 Joyent, Inc.
+
 function getservice {
-    local vmuuid="$(dig +short txt "${domain}" @${NAMESERVER:-8.8.8.8} | tail -1 | sed 's/"//g')"
+    local vmuuid
+    local sdcrole
+    local mantarole
+    vmuuid="$(dig +short txt "${domain}" @"${NAMESERVER:-8.8.8.8}" | tail -1 | sed 's/"//g')"
     if [ "a$vmuuid" == "a" ]; then
         echo "ERROR: ${domain} does not appear to be a CNS name or CNAME to a CNS name" >&2
+        # shellcheck disable=SC2154
         if [[ -z "$SKIP_VERIFY" ]]; then
             exit 1
         fi
     fi
-    local sdcrole="$(sdc-vmadm get ${vmuuid} | json tags.smartdc_role)"
-    local mantarole="$(sdc-vmadm get ${vmuuid} | json tags.manta_role)"
+    sdcrole="$(sdc-vmadm get "${vmuuid}" | json tags.smartdc_role)"
+    mantarole="$(sdc-vmadm get "${vmuuid}" | json tags.manta_role)"
     case "$sdcrole" in
         cloudapi|adminui|docker|cmon|grafana)
             echo "$sdcrole"
@@ -18,7 +30,8 @@ function getservice {
                     echo "manta"
                     ;;
                 *)
-                    echo "ERROR: ${domain} points at VM ${vmuuid} with role ${role}, which is not supported" >&2
+                    # Only one of sdcrole or mantarole will be populated
+                    echo "ERROR: ${domain} points at VM ${vmuuid} with role ${sdcrole}${mantarole}, which is not supported" >&2
                     exit 1
                     ;;
             esac
@@ -27,18 +40,18 @@ function getservice {
 }
 
 function verifyvm {
-    local domain="${1}" vmuuid="${2}"
+    local domain="${1}" vmuuid="${2}" cname acmecname
 
-    if ! dig +short txt "${domain}" @${NAMESERVER:-8.8.8.8} | sed 's/"//g' | grep -w -- "${vmuuid}" >/dev/null; then
+    if ! dig +short txt "${domain}" @"${NAMESERVER:-8.8.8.8}" | sed 's/"//g' | grep -w -- "${vmuuid}" >/dev/null; then
         echo "ERROR: ${domain} does not appear to be a CNS name or CNAME to a CNS name for VM ${vmuuid}" >&2
         if [[ -z "$SKIP_VERIFY" ]]; then
             exit 1
         fi
     fi
 
-    local cname="$(dig +short cname "${domain}" @${NAMESERVER:-8.8.8.8})"
+    cname=$(dig +short cname "${domain}" "@${NAMESERVER:-8.8.8.8}")
     if [ "a$cname" != "a" ]; then
-        local acmecname="$(dig +short cname "_acme-challenge.${domain}" @${NAMESERVER:-8.8.8.8})"
+        acmecname=$(dig +short cname "_acme-challenge.${domain}" @"${NAMESERVER:-8.8.8.8}")
         if [ "a$acmecname" == "a" ]; then
             echo "ERROR: ${domain} is a CNAME to ${cname}, but _acme-challenge.${domain} is not a CNAME" >&2
             if [[ -z "$SKIP_VERIFY" ]]; then
@@ -55,8 +68,8 @@ function waitfortxt {
     read -r -a values <<< "$txtval"
     for val in "${values[@]}"; do
         while [ $count -lt 3 ]; do
-            if dig +short txt "_acme-challenge.${domain}" @${NAMESERVER:-8.8.8.8} | fgrep -- "$val" >/dev/null; then
-                count=$(($count + 1))
+            if dig +short txt "_acme-challenge.${domain}" @"${NAMESERVER:-8.8.8.8}" | grep -F -- "$val" >/dev/null; then
+                count=$((count + 1))
             else
                 count=0
                 sleep 1
@@ -74,11 +87,11 @@ function update_localvm {
 
 function update_remotevm {
     local vmuuid="$1" tokenval="$2"
-    sdc-vmadm get $vmuuid | \
+    sdc-vmadm get "$vmuuid" | \
         json -j customer_metadata not_a_key | \
         json -j -e "this.customer_metadata['triton.cns.acme-challenge'] = '${tokenval}'" | \
         json -j -e "this.payload = { customer_metadata: this.customer_metadata };" payload not_a_key | \
-        sdc-vmadm update $vmuuid
+        sdc-vmadm update "$vmuuid"
 }
 
 function find_path {
@@ -86,7 +99,7 @@ function find_path {
     if [ ! -e "$path" ]; then
         path=/native/$1
         if [ ! -e "$path" ]; then
-            echo "ERROR: failed to find $(basename $path) command" >&2
+            echo "ERROR: failed to find $(basename "$path") command" >&2
             echo "       is this a Triton zone?" >&2
             exit 1
         fi
@@ -99,17 +112,20 @@ function find_path {
 }
 
 function mdata_get {
-    local cmd=$(find_path /usr/sbin/mdata-get)
+    local cmd
+    cmd=$(find_path /usr/sbin/mdata-get)
     $cmd "$@"
 }
 
 function mdata_put {
-    local cmd=$(find_path /usr/sbin/mdata-put)
+    local cmd
+    cmd=$(find_path /usr/sbin/mdata-put)
     $cmd "$@"
 }
 
 function mdata_delete {
-    local cmd=$(find_path /usr/sbin/mdata-delete)
+    local cmd
+    cmd=$(find_path /usr/sbin/mdata-delete)
     $cmd "$@"
 }
 
@@ -117,7 +133,8 @@ function get_zonename {
     # HVM zones won't have a zonename command.
     uname_v=$(uname -v)
     if [[ $uname_v =~ joyent ]]; then
-        local cmd=$(find_path /usr/bin/zonename)
+        local cmd
+        cmd=$(find_path /usr/bin/zonename)
         $cmd
     else
         mdata_get sdc:zonename
@@ -128,7 +145,8 @@ function merge_token {
     local domain="${1}" tokenval="${2}"
     local existing_token
 
-    local zname=$(get_zonename)
+    local zname
+    zname=$(get_zonename)
     if [ "$zname" != "global" ]; then
         existing_token=$(mdata_get triton.cns.acme-challenge)
     else
@@ -136,15 +154,21 @@ function merge_token {
         vmservice=$(getservice "${domain}")
         case "$vmservice" in
         cloudapi|adminui|docker|cmon|grafana)
-            vmuuid="$(vmadm lookup alias=~${vmservice})"
+            vmuuid="$(vmadm lookup alias=~"${vmservice}")"
             existing_token=$(vmadm get "$vmuuid" | json 'customer_metadata.["triton.cns.acme-challenge"]')
             ;;
         manta)
-            local poseidon=$(sdc-useradm get poseidon | json uuid)
+            local poseidon
+            poseidon=$(sdc-useradm get poseidon | json uuid)
             vmuuid=$(sdc-vmadm list -H -o uuid \
                 owner_uuid="$poseidon" alias="loadbalancer" | \
                 sort | tail -1)
             existing_token=$(sdc-vmapi "/vms/$vmuuid" | json -H 'customer_metadata.["triton.cns.acme-challenge"]')
+            ;;
+        *)
+            # We should never hit this becuase it would have been filtered out
+            # much earlier.
+            echo "ERROR: Unknown serivce: $vmservice"
             ;;
         esac
     fi
@@ -162,7 +186,8 @@ function deploy_challenge {
 
     tokenval=$(merge_token "$domain" "$tokenval")
 
-    local zname=$(get_zonename)
+    local zname
+    zname=$(get_zonename)
     if [ "$zname" != "global" ]; then
         verifyvm "$domain" "$zname"
         mdata_put "triton.cns.acme-challenge" "$tokenval"
@@ -170,13 +195,15 @@ function deploy_challenge {
         local vmuuid
         case "$(getservice "${domain}")" in
         cloudapi|adminui|docker|cmon|grafana)
-            local alias="$(getservice "${domain}")0"
-            vmuuid="$(vmadm lookup alias=$alias)"
+            local alias
+            alias="$(getservice "${domain}")0"
+            vmuuid="$(vmadm lookup alias="$alias")"
             verifyvm "$domain" "$vmuuid"
             update_localvm "$vmuuid" "$tokenval"
             ;;
         manta)
-            local poseidon=$(sdc-useradm get poseidon | json uuid)
+            local poseidon
+            poseidon=$(sdc-useradm get poseidon | json uuid)
             vmuuid=$(sdc-vmadm list -H -o uuid \
                 owner_uuid="$poseidon" alias="loadbalancer" | \
                 sort | tail -1)
@@ -199,7 +226,11 @@ function deploy_challenge {
 function clean_challenge {
     local domain="${1}" tokenfn="${2}" tokenval="${3}"
 
-    local zname=$(get_zonename)
+    # We don't use tokenfn, but this will satisfy shellcheck
+    : "$tokenfn" > /dev/null 2>&1
+
+    local zname
+    alias=$(get_zonename)
     if [ "$zname" != "global" ]; then
         verifyvm "$domain" "$zname"
         mdata_delete "triton.cns.acme-challenge"
@@ -207,11 +238,17 @@ function clean_challenge {
         local vmuuid
         case "$(getservice "${domain}")" in
         cloudapi|adminui|docker|cmon|grafana)
-            local alias="$(getservice "${domain}")0"
-            vmuuid="$(vmadm lookup alias=$alias)"
+            local alias
+            alias="$(getservice "${domain}")0"
+            vmuuid="$(vmadm lookup alias="$alias")"
             verifyvm "$domain" "$vmuuid"
             echo "{\"remove_customer_metadata\":[\"triton.cns.acme-challenge\"]}" | \
                 vmadm update "$vmuuid"
+            ;;
+        *)
+            # We should never hit this becuase it would have been filtered out
+            # much earlier.
+            echo "ERROR: Unknown serivce: $vmservice"
             ;;
         esac
     fi
@@ -222,13 +259,15 @@ function clean_challenge {
 function deploy_cert {
     local domain="${1}" keyfile="${2}" certfile="${3}" fullchainfile="${4}" chainfile="${5}"
 
-    local zname=$(get_zonename)
+    local zname
+    zname=$(get_zonename)
     if [ "$zname" != "global" ]; then
         exit 0
     fi
 
     local vmuuid
-    local certdir="$(dirname "$certfile")"
+    local certdir
+    certdir="$(dirname "$certfile")"
     case "$(getservice "${domain}")" in
     cloudapi)
         vmuuid="$(vmadm lookup alias=cloudapi0)"
@@ -244,7 +283,7 @@ function deploy_cert {
         vmuuid="$(vmadm lookup alias=adminui0)"
         cat "${keyfile}" "${fullchainfile}" > "${certdir}/combined.pem"
         cp "${certdir}/combined.pem" "/zones/${vmuuid}/root/opt/smartdc/adminui/etc/ssl/default.pem"
-        rm /zones/${vmuuid}/root/opt/smartdc/adminui/etc/ssl/ADMINUI.*
+        rm /zones/"${vmuuid}"/root/opt/smartdc/adminui/etc/ssl/ADMINUI.*
         zlogin "${vmuuid}" svcadm restart adminui
         echo "OK: adminui certificate deployed, and adminui restarted" >&2
         ;;
@@ -252,22 +291,25 @@ function deploy_cert {
         sdcadm experimental install-docker-cert \
             -k "${keyfile}" -c "${fullchainfile}"
         local ep="tcp://${domain}:2376"
-        local cloudapi_svc=$(sdc-sapi /services?name=cloudapi | json -H 0.uuid)
-        sapiadm get $cloudapi_svc | \
+        local cloudapi_svc
+        cloudapi_svc=$(sdc-sapi /services?name=cloudapi | json -H 0.uuid)
+        sapiadm get "$cloudapi_svc" | \
             json -e "
                 svcs = JSON.parse(this.metadata.CLOUDAPI_SERVICES || '{}');
                 svcs.docker = '${ep}';
                 this.update = {metadata: {CLOUDAPI_SERVICES: JSON.stringify(svcs)}};
                 " update | \
-            sapiadm update $cloudapi_svc
+            sapiadm update "$cloudapi_svc"
         echo "OK: docker certificate deployed" >&2
         ;;
     cmon)
-        cmon_servers=($(sdcadm insts cmon -Ho server))
-        cmon_servers=$(tr ' ' , <<< "${cmon_servers[@]}")
+        # shellcheck disable=SC2207
+        cmon_servers_a=($(sdcadm insts cmon -Ho server))
+        cmon_servers=$(tr ' ' , <<< "${cmon_servers_a[@]}")
 
         sdc-oneachnode -n "$cmon_servers" -X -g "${fullchainfile}" -d /tmp
         sdc-oneachnode -n "$cmon_servers" -X -g "${keyfile}" -d /tmp
+        # shellcheck disable=SC2016
         sdc-oneachnode -n "$cmon_servers" '
         mv /tmp/fullchain.pem /zones/$(vmadm lookup alias=~cmon)/root/data/tls/cert.pem
         mv /tmp/privkey.pem /zones/$(vmadm lookup alias=~cmon)/root/data/tls/key.pem
@@ -275,11 +317,13 @@ function deploy_cert {
         '
         ;;
 	grafana)
-        grafana_servers=($(sdcadm insts grafana -Ho server))
-        grafana_servers=$(tr ' ' , <<< "${grafana_servers[@]}")
+        # shellcheck disable=SC2207
+        grafana_servers_a=($(sdcadm insts grafana -Ho server))
+        grafana_servers=$(tr ' ' , <<< "${grafana_servers_a[@]}")
 
         sdc-oneachnode -n "$grafana_servers" -X -g "${fullchainfile}" -d /tmp
         sdc-oneachnode -n "$grafana_servers" -X -g "${keyfile}" -d /tmp
+        # shellcheck disable=SC2016
         sdc-oneachnode -n "$grafana_servers" '
         mv /tmp/fullchain.pem /zones/$(vmadm lookup alias=~grafana)/root/data/grafana/tls/cert.pem
         mv /tmp/privkey.pem /zones/$(vmadm lookup alias=~grafana)/root/data/grafana/tls/key.pem
@@ -291,10 +335,11 @@ function deploy_cert {
             openssl dhparam 2048 > "${certdir}/dhparams.pem"
         fi
         cat "${keyfile}" "${fullchainfile}" "${certdir}/dhparams.pem" > "${certdir}/stud.pem"
-        local mantazone=$(vmadm lookup alias=manta0)
-        cp "${certdir}/stud.pem" /zones/$mantazone/root/var/tmp/stud.pem
-        zlogin $mantazone bash --login -c '/opt/smartdc/manta-deployment/cmd/manta-replace-cert.js /var/tmp/stud.pem'
-        rm /zones/$mantazone/root/var/tmp/stud.pem
+        local mantazone
+        mantazone=$(vmadm lookup alias=manta0)
+        cp "${certdir}/stud.pem" "/zones/$mantazone/root/var/tmp/stud.pem"
+        zlogin "$mantazone" bash --login -c '/opt/smartdc/manta-deployment/cmd/manta-replace-cert.js /var/tmp/stud.pem'
+        rm "/zones/$mantazone/root/var/tmp/stud.pem"
         echo "OK: New Manta certificate deployed, but loadbalancers have not been restarted." >&2
         echo "    You will need to visit each loadbalancer instance with manta-login and " >&2
         echo "    restart the 'stud' service." >&2
@@ -309,13 +354,18 @@ function deploy_cert {
 function unchanged_cert {
     local domain="${1}" keyfile="${2}" certfile="${3}" fullchainfile="${4}" chainfile="${5}"
 
-    local zname=$(get_zonename)
+    # We don't use chainfile, but this will satisfy shellcheck
+    : "$chainfile" > /dev/null 2>&1
+
+    local zname
+    zname=$(get_zonename)
     if [ "$zname" != "global" ]; then
         exit 0
     fi
 
     local vmuuid
-    local certdir="$(dirname "$certfile")"
+    local certdir
+    certdir="$(dirname "$certfile")"
     case "$(getservice "${domain}")" in
     cloudapi)
         vmuuid="$(vmadm lookup alias=cloudapi0)"
@@ -337,7 +387,7 @@ function unchanged_cert {
         local target="/zones/${vmuuid}/root/opt/smartdc/adminui/etc/ssl/default.pem"
         if ! diff "${certdir}/combined.pem" "${target}" >/dev/null; then
             cp "${certdir}/combined.pem" "${target}"
-            rm /zones/${vmuuid}/root/opt/smartdc/adminui/etc/ssl/ADMINUI.*
+            rm /zones/"${vmuuid}"/root/opt/smartdc/adminui/etc/ssl/ADMINUI.*
             zlogin "${vmuuid}" svcadm restart adminui
             echo "OK: adminui certificate deployed, and adminui restarted" >&2
         fi
