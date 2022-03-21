@@ -230,7 +230,7 @@ function clean_challenge {
     : "$tokenfn" > /dev/null 2>&1
 
     local zname
-    alias=$(get_zonename)
+    zname=$(get_zonename)
     if [ "$zname" != "global" ]; then
         verifyvm "$domain" "$zname"
         mdata_delete "triton.cns.acme-challenge"
