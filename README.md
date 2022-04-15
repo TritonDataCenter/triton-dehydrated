@@ -21,7 +21,7 @@ installed from pkgsrc or pkgsrc-tools.
 ## How to use: headnode services (CloudAPI etc)
 
  1. Set up CNS in your Triton deployment (see
-    [the CNS operator guide](https://github.com/joyent/triton-cns/blob/master/docs/operator-guide.md)).
+    [the CNS operator guide](https://github.com/tritondatacenter/triton-cns/blob/master/docs/operator-guide.md)).
     We'll assume for the sake of examples here that the CNS suffix for the
     DC is `dc1.cns.example.com`.
  2. Decide either to use the CNS-generated names for `cloudapi`, `adminui` and
@@ -40,7 +40,7 @@ installed from pkgsrc or pkgsrc-tools.
     <!-- markdownlint-disable MD013 -->
     ```shell
     mkdir -p /opt/dehydrated
-    latest=$(curl -s https://api.github.com/repos/joyent/triton-dehydrated/releases/latest | json assets.0.browser_download_url)
+    latest=$(curl -s https://api.github.com/repos/tritondatacenter/triton-dehydrated/releases/latest | json assets.0.browser_download_url)
     curl -L "$latest" | gtar --no-same-owner -zxv -C /opt/dehydrated
     ```
     <!-- markdownlint-enable MD013 -->
@@ -113,7 +113,7 @@ should work on LX-branded zones as well.
 
  1. Either use the Triton public cloud, or set up CNS in your Triton
     deployment (see
-    [the CNS operator guide](https://github.com/joyent/triton-cns/blob/master/docs/operator-guide.md)).
+    [the CNS operator guide](https://github.com/tritondatacenter/triton-cns/blob/master/docs/operator-guide.md)).
     We'll assume for the sake of example here that the CNS suffix for the
     DC is `us-west-1.triton.zone`.
  2. Find the CNS-generated name for your container. One way to do this is
@@ -131,7 +131,7 @@ should work on LX-branded zones as well.
     `_acme-challenge.blog.example.com` as a CNAME to
     `_acme-challenge.blog.svc.3c330096-89e6-11e7-9f13-23d71a63353e.us-west-1.triton.zone`.
  5. Inside the container, download and extract the `dehydrated.tar.gz` file
-    from the [latest GitHub release](https://github.com/joyent/triton-dehydrated/releases/)
+    from the [latest GitHub release](https://github.com/tritondatacenter/triton-dehydrated/releases/)
     into a directory.
  6. Create a new file `domains.txt` in the directory containing just one line
     with the full domain name you want on the certificate (e.g.
