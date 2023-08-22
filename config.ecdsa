@@ -1,7 +1,7 @@
-# This file is for serivces that should use an ECDSA certificate. Currently,
-# this is strongly recomended for CMON. Docker and AdminUI may also use ECDSA
-# but by default will use RSA. CloudAPI and Manta, due to their use of stud,
-# will crash if supplied with an ECDSA certificate.
+# This file is for services that should use an ECDSA certificate. Currently,
+# this is strongly recomended for CMON. All other services and clients support
+# both RSA and ECDSA, but if you have an older version of some serives that use
+# stud you will need to use RSA.
 #
 # To deploy an ECDSA certificate for cmon, create `domains.ecdsa.txt` with the
 # name of your cmon zone (including a wildcard name). E.g.:
