@@ -6,6 +6,7 @@
 
 # Copyright 2021 Joyent, Inc.
 # Copyright 2023 MNX Cloud, Inc.
+# Copyright 2024 MNX Cloud, Inc.
 
 function getservice {
     local vmuuid
@@ -248,7 +249,7 @@ function clean_challenge {
                     vmadm update "$vmuuid"
                 ;;
             *)
-                # We should never hit this becuase it would have been filtered out
+                # We should never hit this because it would have been filtered out
                 # much earlier.
                 echo "ERROR: Unknown service: $vmservice"
                 ;;
