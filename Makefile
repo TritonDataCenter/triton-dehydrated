@@ -3,6 +3,7 @@
 # file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 # Copyright 2021 Joyent, Inc.
+# Copyright 2024 MNX Cloud, Inc.
 
 SCRIPT=		deps/dehydrated/dehydrated
 ARCHIVE=	dehydrated.tar.gz
@@ -11,7 +12,7 @@ VERSION=	$(shell git tag --sort=taggerdate | tail -1)
 # Prevent macOS from putting resource forks in the tar
 export COPYFILE_DISABLE=true
 
-.PHONY: archive patch release subclean
+.PHONY: archive release subclean
 archive: $(ARCHIVE)
 
 release: clean .version $(ARCHIVE)
@@ -21,10 +22,9 @@ release: clean .version $(ARCHIVE)
 	echo "$(VERSION)" > $@
 	git rev-parse HEAD 2>/dev/null >> $@
 
-$(ARCHIVE): clean $(SCRIPT) patch .version
+$(ARCHIVE): clean $(SCRIPT) .version
 	find . -type f \
 	    -not -path '*/.git/*' \
-	    -not -path '*/PATCHES/*' \
 	    -not -name '.git*' \
 	    -not -name '.travis.yml' \
 	    -not -name 'Makefile' \
@@ -33,11 +33,6 @@ $(ARCHIVE): clean $(SCRIPT) patch .version
 
 $(SCRIPT):
 	git submodule init && git submodule update
-
-# This is a temporary hack to work around an upstream bug. We want a better
-# way to handle this.
-patch: $(SCRIPT)
-	patch -p1 $< < PATCHES/000-fix-grep.patch
 
 subclean:
 	git submodule foreach --recursive git reset --hard
