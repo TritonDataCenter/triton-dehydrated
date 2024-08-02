@@ -3,6 +3,7 @@
 # file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 # Copyright 2021 Joyent, Inc.
+# Copyright 2024 MNX Cloud, Inc.
 
 SCRIPT=		deps/dehydrated/dehydrated
 ARCHIVE=	dehydrated.tar.gz
