@@ -1,0 +1,31 @@
+From 2140d744dc582a438a0ca56c64e022103ae975f5 Mon Sep 17 00:00:00 2001
+From: Brianna Bennett <bahamat@digitalelf.net>
+Date: Tue, 6 Aug 2024 13:47:45 -0700
+Subject: [PATCH] dehydrated#910 hexdump not always available
+
+---
+ dehydrated | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/dehydrated b/dehydrated
+index a15fb048..fe9e660d 100755
+--- a/dehydrated
++++ b/dehydrated
+@@ -260,7 +260,7 @@ _mktemp() {
+ # Check for script dependencies
+ check_dependencies() {
+   # look for required binaries
+-  for binary in grep mktemp diff sed awk curl cut head tail hexdump; do
++  for binary in grep mktemp diff sed awk curl cut head tail od; do
+     bin_path="$(command -v "${binary}" 2>/dev/null)" || _exiterr "This script requires ${binary}."
+     [[ -x "${bin_path}" ]] || _exiterr "${binary} found in PATH but it's not executable"
+   done
+@@ -839,7 +839,7 @@ hex2bin() {
+ 
+ # Convert binary data to hex string
+ bin2hex() {
+-  hexdump -v -e '/1 "%02x"'
++  od -t xC -An | tr -d '[:space:]'
+ }
+ 
+ # OpenSSL writes to stderr/stdout even when there are no errors. So just
