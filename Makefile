@@ -12,7 +12,7 @@ VERSION=	$(shell git tag --sort=taggerdate | tail -1)
 # Prevent macOS from putting resource forks in the tar
 export COPYFILE_DISABLE=true
 
-.PHONY: archive release subclean
+.PHONY: archive patch release subclean
 archive: $(ARCHIVE)
 
 release: clean .version $(ARCHIVE)
@@ -22,7 +22,7 @@ release: clean .version $(ARCHIVE)
 	echo "$(VERSION)" > $@
 	git rev-parse HEAD 2>/dev/null >> $@
 
-$(ARCHIVE): clean $(SCRIPT) .version
+$(ARCHIVE): clean $(SCRIPT) patch .version
 	find . -type f \
 	    -not -path '*/.git/*' \
 	    -not -name '.git*' \
@@ -33,6 +33,12 @@ $(ARCHIVE): clean $(SCRIPT) .version
 
 $(SCRIPT):
 	git submodule init && git submodule update
+
+# This is a temporary hack to work around an upstream bug. We want a better
+# way to handle this.
+# https://github.com/dehydrated-io/dehydrated/issues/910
+patch: $(SCRIPT)
+	patch -p1 $< < PATCHES/000-fix-hexdump-check.patch
 
 subclean:
 	git submodule foreach --recursive git reset --hard
