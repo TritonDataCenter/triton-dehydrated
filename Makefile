@@ -25,6 +25,7 @@ release: clean .version $(ARCHIVE)
 $(ARCHIVE): clean $(SCRIPT) patch .version
 	find . -type f \
 	    -not -path '*/.git/*' \
+	    -not -path '*/PATCHES/*' \
 	    -not -name '.git*' \
 	    -not -name '.travis.yml' \
 	    -not -name 'Makefile' \
