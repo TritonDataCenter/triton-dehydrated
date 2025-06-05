@@ -9,7 +9,7 @@
 
 # triton-dehydrated
 
-[dehydrated](https://github.com/lukas2511/dehydrated) hook script to set up
+[dehydrated](https://github.com/dehydrated-io/dehydrated) hook script to set up
 certificates automatically for Triton, using DNS challenges. Requires CNS.
 
 ## Before You Begin
